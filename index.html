@@ -46,6 +46,8 @@
 
   /* ---------- App shell ---------- */
   .app{max-width:640px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+  .file-input-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);
+    white-space:nowrap;border:0;padding:0;margin:-1px;opacity:0}
   header.topbar{
     padding:calc(var(--safe-top) + 14px) 20px 12px;
     display:flex;align-items:baseline;gap:10px;
@@ -227,6 +229,7 @@
   <header class="topbar">
     <span class="brand">栞</span>
     <span class="brand-sub">SHIORI</span>
+    <span class="brand-sub" id="app-version" style="margin-left:auto"></span>
   </header>
 
   <main>
@@ -252,7 +255,7 @@
 
       <div class="row" style="margin-top:10px">
         <button class="tinybtn" id="btn-img">＋ 図・画像を添付</button>
-        <input type="file" id="img-file" accept="image/*" multiple hidden>
+        <input type="file" id="img-file" accept="image/*" multiple class="file-input-hidden">
       </div>
       <div class="imgstrip" id="img-strip"></div>
 
@@ -301,7 +304,7 @@
         <div class="row" style="margin-top:12px">
           <button class="tinybtn" id="btn-export">書き出す（.json）</button>
           <button class="tinybtn" id="btn-import">読み込む</button>
-          <input type="file" id="import-file" accept="application/json,.json" hidden>
+          <input type="file" id="import-file" accept="application/json,.json" class="file-input-hidden">
         </div>
       </div>
       <div class="card">
@@ -793,7 +796,7 @@ function openBookForm(existing){
   const b = existing||{title:"",author:"",cover:null,chapters:[],status:"reading"};
   openSheet(`<h2>${existing?"本を編集":"本を追加"}</h2>
     <button class="coverbtn" id="cov-btn">${b.cover?`<img src="${b.cover}">`:"＋ 表紙を撮る / 選ぶ"}</button>
-    <input type="file" id="cov-file" accept="image/*" hidden>
+    <input type="file" id="cov-file" accept="image/*" class="file-input-hidden">
     <div class="lbl-in">タイトル</div>
     <input class="in" id="f-title" value="${esc(b.title)}" placeholder="本のタイトル">
     <div class="lbl-in">著者（任意）</div>
@@ -873,7 +876,7 @@ function openEntry(id){
     <div class="imgstrip" id="ei-strip"></div>
     <div class="row" style="margin:6px 0 4px">
       <button class="tinybtn" id="ei-add">＋ 画像を追加</button>
-      <input type="file" id="ei-file" accept="image/*" multiple hidden>
+      <input type="file" id="ei-file" accept="image/*" multiple class="file-input-hidden">
     </div>
     ${chaps.length?`<div class="lbl-in">章</div><div class="chips" id="e-chaps">
       ${chaps.map(c=>`<button class="chip ${e.chapter===c?"on":""}" data-ec="${esc(c)}">${esc(c)}</button>`).join("")}
@@ -980,7 +983,9 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
+const APP_VERSION = "v5";
 (async function(){
+  $("app-version").textContent = APP_VERSION;
   await loadAll();
   switchView("capture");
   if("serviceWorker" in navigator){
