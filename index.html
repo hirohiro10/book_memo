@@ -120,13 +120,22 @@
   /* ---------- Passage display + highlighter signature ---------- */
   .passage{font-family:var(--mincho);font-size:17px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
   .passage.mark{
+    line-height:1.7;
     background-image:linear-gradient(transparent 78%, var(--brass-mark) 78%);
-    background-repeat:no-repeat;
+    background-size:100% 1.7em;
+    background-repeat:repeat-y;
     padding:0 .05em;
   }
   .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
   .entry-meta .tag{color:var(--indigo)}
   .entry-note{font-size:13px;color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
+  .imgstrip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .imgstrip .th{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}
+  .imgstrip .th img{width:100%;height:100%;object-fit:cover;display:block}
+  .imgstrip .th .rm{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
+    background:rgba(35,49,77,.78);color:#fff;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .entry-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-top:10px}
+  .entry-imgs img{width:100%;border-radius:8px;border:1px solid var(--line);display:block}
 
   /* today's passage — 栞 ribbon signature */
   .today{position:relative;padding-left:26px;overflow:hidden}
@@ -238,6 +247,12 @@
       </div>
 
       <textarea class="note" id="note" placeholder="ひとことメモ（なぜ心に留めたか・任意）"></textarea>
+
+      <div class="row" style="margin-top:10px">
+        <button class="tinybtn" id="btn-img">＋ 図・画像を添付</button>
+        <input type="file" id="img-file" accept="image/*" multiple hidden>
+      </div>
+      <div class="imgstrip" id="img-strip"></div>
 
       <div class="field-label" id="chap-label" hidden>章</div>
       <div class="chips" id="chap-chips" hidden></div>
@@ -352,7 +367,7 @@ const DB = (() => {
 
 /* ---------- state ---------- */
 const state = { books:[], entries:[], currentBookId:null, view:"capture",
-  draft:{chapter:null, tags:[]}, viewingBookId:null, filterTag:null, search:"" };
+  draft:{chapter:null, tags:[], images:[]}, viewingBookId:null, filterTag:null, search:"" };
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
 const $ = id => document.getElementById(id);
@@ -437,21 +452,22 @@ function closeSheet(){
 $("overlay").addEventListener("click", closeSheet);
 
 /* ---------- image downscale for covers ---------- */
-function fileToCover(file){
+function downscaleImage(file, max=1280, quality=0.8){
   return new Promise((res)=>{
     const img=new Image(), url=URL.createObjectURL(file);
     img.onload=()=>{
-      const max=640, scale=Math.min(1, max/Math.max(img.width,img.height));
+      const scale=Math.min(1, max/Math.max(img.width,img.height));
       const c=document.createElement("canvas");
       c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
       c.getContext("2d").drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(url);
-      res(c.toDataURL("image/jpeg",0.72));
+      res(c.toDataURL("image/jpeg",quality));
     };
     img.onerror=()=>{URL.revokeObjectURL(url);res(null)};
     img.src=url;
   });
 }
+const fileToCover = file => downscaleImage(file, 640, 0.72);
 
 /* =======================================================================
    RENDER
@@ -491,8 +507,16 @@ function renderCapture(){
     tags.map(t=>`<button class="chip ${state.draft.tags.includes(t)?"on":""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")
     + `<button class="chip add" id="tag-add">＋ タグ</button>`;
 
-  const hasText = $("passage").value.trim().length>0;
-  $("btn-save").disabled = !(hasText && state.currentBookId);
+  renderImgStrip();
+  updateSaveState();
+}
+function renderImgStrip(){
+  $("img-strip").innerHTML = state.draft.images.map((s,i)=>
+    `<span class="th"><img src="${s}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></span>`).join("");
+}
+function updateSaveState(){
+  const hasContent = $("passage").value.trim().length>0 || state.draft.images.length>0;
+  $("btn-save").disabled = !(hasContent && state.currentBookId);
 }
 
 /* -------- 本棚 -------- */
@@ -564,8 +588,10 @@ function entryCard(e, opts={}){
     e.chapter ? esc(e.chapter) : "",
     fmtDate(e.createdAt)
   ].filter(Boolean).join("　·　");
+  const imgs=(e.images&&e.images.length)?`<div class="entry-imgs">${e.images.map(s=>`<img src="${s}" loading="lazy">`).join("")}</div>`:"";
   return `<button class="card" data-entry="${e.id}" style="display:block;width:100%;text-align:left">
-    <div class="passage mark">${esc(e.text)}</div>
+    ${e.text?`<div class="passage mark">${esc(e.text)}</div>`:""}
+    ${imgs}
     ${e.note?`<div class="entry-note">${esc(e.note)}</div>`:""}
     <div class="entry-meta">${esc0(meta)} ${tags}</div>
   </button>`;
@@ -583,9 +609,11 @@ function renderReview(){
   const tw=$("today-wrap");
   if(todayEntry){
     const b=bookById(todayEntry.bookId);
+    const tImgs=(todayEntry.images&&todayEntry.images.length)?`<div class="entry-imgs">${todayEntry.images.map(s=>`<img src="${s}">`).join("")}</div>`:"";
     tw.innerHTML = `<div class="card today">
       <div class="kicker">今日の一節</div>
-      <div class="passage mark">${esc(todayEntry.text)}</div>
+      ${todayEntry.text?`<div class="passage mark">${esc(todayEntry.text)}</div>`:""}
+      ${tImgs}
       ${todayEntry.note?`<div class="entry-note">${esc(todayEntry.note)}</div>`:""}
       <div class="entry-meta">${b?esc(b.title):""}　·　${fmtDate(todayEntry.createdAt)}</div>
       <div class="row" style="margin-top:12px"><button class="tinybtn" id="reshuffle">別の一節</button></div>
@@ -644,7 +672,24 @@ $("passage").addEventListener("paste",(e)=>{
     const ta=$("passage"); ta.value = ta.value ? ta.value+"\n\n"+c : c;
     ta.dataset.raw=t; render(); }
 });
-$("passage").addEventListener("input",()=>{ $("btn-save").disabled=!( $("passage").value.trim() && state.currentBookId); });
+$("passage").addEventListener("input",updateSaveState);
+
+/* --- 図・画像の添付 --- */
+$("btn-img").addEventListener("click",()=>$("img-file").click());
+$("img-file").addEventListener("change", async e=>{
+  for(const f of e.target.files){
+    if(state.draft.images.length>=6){ toast("画像は1つの栞につき6枚までです"); break; }
+    const d=await downscaleImage(f);
+    if(d) state.draft.images.push(d);
+  }
+  e.target.value="";
+  renderImgStrip(); updateSaveState();
+});
+$("img-strip").addEventListener("click",e=>{
+  const b=e.target.closest("[data-rm]"); if(!b) return;
+  state.draft.images.splice(+b.dataset.rm,1);
+  renderImgStrip(); updateSaveState();
+});
 
 $("btn-clip").addEventListener("click", async ()=>{
   try{
@@ -689,17 +734,18 @@ function promptNewTag(){
 /* --- save entry --- */
 $("btn-save").addEventListener("click", async ()=>{
   const text=$("passage").value.trim();
-  if(!text){ toast("本文がありません"); return; }
+  const images=[...state.draft.images];
+  if(!text && !images.length){ toast("本文か画像を入れてください"); return; }
   if(!state.currentBookId){ toast("先に本を選んでください"); openBookPicker(); return; }
   const entry={
-    id:uid(), bookId:state.currentBookId, text,
+    id:uid(), bookId:state.currentBookId, text, images,
     raw:$("passage").dataset.raw||text, note:$("note").value.trim(),
     chapter:state.draft.chapter, tags:[...state.draft.tags], createdAt:Date.now()
   };
   await DB.put("entries",entry);
   await loadAll();
-  // reset text & note & tags, keep book & chapter (連続入力向け)
-  $("passage").value=""; $("passage").dataset.raw=""; $("note").value=""; state.draft.tags=[];
+  // reset text & note & tags & images, keep book & chapter (連続入力向け)
+  $("passage").value=""; $("passage").dataset.raw=""; $("note").value=""; state.draft.tags=[]; state.draft.images=[];
   render();
   toast("栞をはさみました");
 });
@@ -732,7 +778,7 @@ function openBookForm(existing){
   const b = existing||{title:"",author:"",cover:null,chapters:[],status:"reading"};
   openSheet(`<h2>${existing?"本を編集":"本を追加"}</h2>
     <button class="coverbtn" id="cov-btn">${b.cover?`<img src="${b.cover}">`:"＋ 表紙を撮る / 選ぶ"}</button>
-    <input type="file" id="cov-file" accept="image/*" capture="environment" hidden>
+    <input type="file" id="cov-file" accept="image/*" hidden>
     <div class="lbl-in">タイトル</div>
     <input class="in" id="f-title" value="${esc(b.title)}" placeholder="本のタイトル">
     <div class="lbl-in">著者（任意）</div>
@@ -808,6 +854,12 @@ function openEntry(id){
     <textarea class="in area" id="e-text" style="min-height:120px;font-family:var(--mincho);font-size:16px">${esc(e.text)}</textarea>
     <div class="lbl-in">ひとことメモ</div>
     <textarea class="in area" id="e-note" placeholder="任意">${esc(e.note||"")}</textarea>
+    <div class="lbl-in">図・画像</div>
+    <div class="imgstrip" id="ei-strip"></div>
+    <div class="row" style="margin:6px 0 4px">
+      <button class="tinybtn" id="ei-add">＋ 画像を追加</button>
+      <input type="file" id="ei-file" accept="image/*" multiple hidden>
+    </div>
     ${chaps.length?`<div class="lbl-in">章</div><div class="chips" id="e-chaps">
       ${chaps.map(c=>`<button class="chip ${e.chapter===c?"on":""}" data-ec="${esc(c)}">${esc(c)}</button>`).join("")}
     </div>`:""}
@@ -820,7 +872,24 @@ function openEntry(id){
     <button class="primary" id="e-save">保存する</button>
     <button class="destructive" id="e-del">この栞を削除</button>`);
 
-  let chapter=e.chapter, tags=[...(e.tags||[])];
+  let chapter=e.chapter, tags=[...(e.tags||[])], images=[...(e.images||[])];
+  const paintImgs=()=>{
+    $("ei-strip").innerHTML = images.map((s,i)=>
+      `<span class="th"><img src="${s}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></span>`).join("");
+  };
+  paintImgs();
+  $("ei-add").addEventListener("click",()=>$("ei-file").click());
+  $("ei-file").addEventListener("change", async ev=>{
+    for(const f of ev.target.files){
+      if(images.length>=6){ toast("画像は1つの栞につき6枚までです"); break; }
+      const d=await downscaleImage(f); if(d) images.push(d);
+    }
+    ev.target.value=""; paintImgs();
+  });
+  $("ei-strip").addEventListener("click",ev=>{
+    const b=ev.target.closest("[data-rm]"); if(!b) return;
+    images.splice(+b.dataset.rm,1); paintImgs();
+  });
   const eTags=$("e-tags");
   const paintTags=()=>{ eTags.querySelectorAll("[data-et]").forEach(el=>el.classList.toggle("on",tags.includes(el.dataset.et))); };
   if($("e-chaps")) $("e-chaps").addEventListener("click",ev=>{
@@ -843,8 +912,8 @@ function openEntry(id){
   });
   $("e-save").addEventListener("click", async ()=>{
     e.text=$("e-text").value.trim(); e.note=$("e-note").value.trim();
-    e.chapter=chapter; e.tags=tags;
-    if(!e.text){ toast("本文がありません"); return; }
+    e.chapter=chapter; e.tags=tags; e.images=images;
+    if(!e.text && !images.length){ toast("本文か画像を入れてください"); return; }
     await DB.put("entries",e); await loadAll(); closeSheet(); render(); toast("保存しました");
   });
   $("e-del").addEventListener("click", async ()=>{
