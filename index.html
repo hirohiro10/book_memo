@@ -119,13 +119,7 @@
 
   /* ---------- Passage display + highlighter signature ---------- */
   .passage{font-family:var(--mincho);font-size:17px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
-  .passage.mark{
-    line-height:1.7;
-    background-image:linear-gradient(transparent 78%, var(--brass-mark) 78%);
-    background-size:100% 1.7em;
-    background-repeat:repeat-y;
-    padding:0 .05em;
-  }
+  .passage.mark{ /* マーカー装飾は削除済み(ユーザー設定によりプレーン表示) */ }
   .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
   .entry-meta .tag{color:var(--indigo)}
   .entry-note{font-size:13px;color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
@@ -161,6 +155,14 @@
   .empty .big{font-family:var(--mincho);font-size:17px;color:var(--ink-soft);display:block;margin-bottom:6px}
   .search{width:100%;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:11px 16px;font-size:15px;margin-bottom:12px}
   .group-h{font-family:var(--mincho);font-size:13px;letter-spacing:.1em;color:var(--ink-soft);margin:18px 4px 8px}
+
+  /* review-only font size control */
+  #v-review .passage{font-size:var(--rfs,17px)}
+  #v-review .entry-note{font-size:var(--rfs-note,13px)}
+  .fs-seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;margin-left:auto}
+  .fs-seg button{padding:7px 13px;font-size:12px;color:var(--ink-soft);background:var(--card)}
+  .fs-seg button.on{background:var(--indigo);color:#fff}
+  .fs-row{display:flex;align-items:center;margin-bottom:12px}
 
   /* ---------- bottom nav ---------- */
   nav.tabs{
@@ -278,6 +280,12 @@
     <!-- ============ 見返す ============ -->
     <section class="view" id="v-review" hidden>
       <div class="view-title">見返す</div>
+      <div class="fs-row">
+        <div style="flex:1"></div>
+        <div class="fs-seg" id="fs-seg">
+          <button data-fs="0">大</button><button data-fs="1">中</button><button data-fs="2">小</button>
+        </div>
+      </div>
       <div id="today-wrap"></div>
       <input class="search" id="search" placeholder="本文・メモを検索">
       <div class="chips" id="filter-tags" style="margin-bottom:6px"></div>
@@ -367,7 +375,8 @@ const DB = (() => {
 
 /* ---------- state ---------- */
 const state = { books:[], entries:[], currentBookId:null, view:"capture",
-  draft:{chapter:null, tags:[], images:[]}, viewingBookId:null, filterTag:null, search:"" };
+  draft:{chapter:null, tags:[], images:[]}, viewingBookId:null, filterTag:null, search:"", reviewFontStep:0 };
+const FONT_STEPS = [ {passage:17,note:13}, {passage:15,note:12}, {passage:13,note:11} ];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
 const $ = id => document.getElementById(id);
@@ -422,12 +431,13 @@ function fmtDate(ts){
 
 /* ---------- load & persist ---------- */
 async function loadAll(){
-  const [books, entries, cur] = await Promise.all([
-    DB.getAll("books"), DB.getAll("entries"), DB.get("meta","currentBookId")
+  const [books, entries, cur, fs] = await Promise.all([
+    DB.getAll("books"), DB.getAll("entries"), DB.get("meta","currentBookId"), DB.get("meta","reviewFontStep")
   ]);
   state.books = books.sort((a,b)=>b.createdAt-a.createdAt);
   state.entries = entries.sort((a,b)=>b.createdAt-a.createdAt);
   state.currentBookId = cur ? cur.value : (state.books[0]?.id ?? null);
+  state.reviewFontStep = fs ? fs.value : 0;
 }
 const setCurrentBook = async id => { state.currentBookId=id; await DB.put("meta",{key:"currentBookId",value:id}); };
 const bookById = id => state.books.find(b=>b.id===id);
@@ -605,6 +615,11 @@ function pickToday(){
   todayEntry = pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
 }
 function renderReview(){
+  const step = FONT_STEPS[state.reviewFontStep]||FONT_STEPS[0];
+  $("v-review").style.setProperty("--rfs", step.passage+"px");
+  $("v-review").style.setProperty("--rfs-note", step.note+"px");
+  $("fs-seg").querySelectorAll("[data-fs]").forEach(b=>b.classList.toggle("on", +b.dataset.fs===state.reviewFontStep));
+
   if(!todayEntry || !state.entries.find(e=>e.id===todayEntry.id)) pickToday();
   const tw=$("today-wrap");
   if(todayEntry){
@@ -931,6 +946,12 @@ $("filter-tags").addEventListener("click",e=>{
   renderReview();
 });
 $("search").addEventListener("input",e=>{ state.search=e.target.value; renderReview(); });
+$("fs-seg").addEventListener("click", async e=>{
+  const b=e.target.closest("[data-fs]"); if(!b) return;
+  state.reviewFontStep = +b.dataset.fs;
+  await DB.put("meta",{key:"reviewFontStep",value:state.reviewFontStep});
+  renderReview();
+});
 
 /* --- export / import --- */
 $("btn-export").addEventListener("click", async ()=>{
