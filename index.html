@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#35507A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="栞">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>栞 — 読書メモ</title>
+<style>
+  :root{
+    --paper:#EFEDE6;
+    --card:#FBFAF6;
+    --ink:#23314D;
+    --ink-soft:#5B6478;
+    --ink-faint:#8A91A0;
+    --line:rgba(35,49,77,.12);
+    --line-strong:rgba(35,49,77,.22);
+    --indigo:#35507A;
+    --indigo-press:#2A4064;
+    --brass:#B8912F;
+    --brass-mark:rgba(184,145,47,.30);
+    --danger:#9A3B32;
+    --radius:14px;
+    --mincho:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP","Songti SC",serif;
+    --gothic:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",system-ui,sans-serif;
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+    --safe-top:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--gothic);
+    color:var(--ink);
+    background:var(--paper);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  input,textarea,select{font-family:inherit;color:inherit;font-size:16px}
+  textarea{line-height:1.7}
+
+  /* ---------- App shell ---------- */
+  .app{max-width:640px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+  header.topbar{
+    padding:calc(var(--safe-top) + 14px) 20px 12px;
+    display:flex;align-items:baseline;gap:10px;
+    border-bottom:1px solid var(--line);
+    background:var(--paper);
+    position:sticky;top:0;z-index:5;
+  }
+  .brand{font-family:var(--mincho);font-size:22px;letter-spacing:.14em;font-weight:600}
+  .brand-sub{font-size:11px;color:var(--ink-faint);letter-spacing:.18em}
+  main{flex:1;padding:16px 16px 96px;animation:fade .28s ease}
+  #v-capture{padding-bottom:84px}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .view[hidden]{display:none}
+  .view-title{font-family:var(--mincho);font-size:15px;letter-spacing:.12em;color:var(--ink-soft);margin:4px 2px 14px}
+
+  /* ---------- Cards ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .card + .card{margin-top:12px}
+
+  /* ---------- Capture (記録) ---------- */
+  .bookpick{
+    width:100%;display:flex;align-items:center;gap:12px;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px 14px;margin-bottom:14px;text-align:left;
+  }
+  .bookpick .cover{width:34px;height:48px;border-radius:4px;object-fit:cover;background:var(--indigo);flex:none;
+    display:flex;align-items:center;justify-content:center;color:var(--paper);font-family:var(--mincho);font-size:18px}
+  .bookpick .meta{flex:1;min-width:0}
+  .bookpick .label{font-size:10px;letter-spacing:.16em;color:var(--ink-faint)}
+  .bookpick .name{font-family:var(--mincho);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bookpick .chev{color:var(--ink-faint);font-size:18px}
+
+  .paste-area{
+    width:100%;min-height:150px;resize:vertical;
+    border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--card);padding:14px;font-family:var(--mincho);font-size:17px;color:var(--ink);
+  }
+  .paste-area::placeholder{color:var(--ink-faint);font-family:var(--gothic);font-size:14px;line-height:1.7}
+  .paste-area:focus{outline:2px solid var(--indigo);outline-offset:1px}
+
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tinybtn{
+    font-size:13px;padding:8px 12px;border-radius:999px;border:1px solid var(--line-strong);
+    color:var(--ink-soft);background:var(--card);
+  }
+  .tinybtn:active{background:#efece3}
+  .note{
+    width:100%;margin-top:10px;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--card);padding:11px 14px;font-size:15px;min-height:44px;resize:vertical;
+  }
+  .field-label{font-size:11px;letter-spacing:.14em;color:var(--ink-faint);margin:16px 2px 8px}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:none;font-size:13px;padding:8px 14px;border-radius:999px;
+    border:1px solid var(--line-strong);color:var(--ink-soft);background:var(--card);white-space:nowrap;
+  }
+  .chip.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .chip.add{border-style:dashed;color:var(--ink-faint)}
+
+  .save{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(var(--safe-bottom) + 74px);
+    width:min(608px,calc(100% - 32px));
+    background:var(--indigo);color:#fff;font-size:16px;font-weight:600;letter-spacing:.08em;
+    padding:15px;border-radius:var(--radius);box-shadow:0 6px 20px rgba(35,49,77,.22);z-index:4;
+  }
+  .save:active{background:var(--indigo-press)}
+  .save[disabled]{opacity:.4}
+
+  /* ---------- Passage display + highlighter signature ---------- */
+  .passage{font-family:var(--mincho);font-size:17px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .passage.mark{
+    background-image:linear-gradient(transparent 78%, var(--brass-mark) 78%);
+    background-repeat:no-repeat;
+    padding:0 .05em;
+  }
+  .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
+  .entry-meta .tag{color:var(--indigo)}
+  .entry-note{font-size:13px;color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
+
+  /* today's passage — 栞 ribbon signature */
+  .today{position:relative;padding-left:26px;overflow:hidden}
+  .today::before{
+    content:"";position:absolute;left:14px;top:-2px;width:10px;height:52px;background:var(--brass);
+    clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
+  }
+  .today .kicker{font-size:11px;letter-spacing:.2em;color:var(--brass);font-weight:700;margin-bottom:10px}
+
+  /* ---------- Book shelf ---------- */
+  .shelf{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .book{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;text-align:left;display:flex;flex-direction:column;gap:8px}
+  .book .cover{width:100%;aspect-ratio:3/4;border-radius:8px;object-fit:cover;background:var(--indigo);
+    display:flex;align-items:center;justify-content:center;color:var(--paper);font-family:var(--mincho);font-size:22px;text-align:center;padding:8px;line-height:1.3}
+  .book .bt{font-family:var(--mincho);font-size:14px;line-height:1.4;max-height:2.8em;overflow:hidden}
+  .book .ba{font-size:11px;color:var(--ink-faint)}
+  .book .bc{font-size:11px;color:var(--ink-soft)}
+  .book .now{display:inline-block;font-size:10px;color:var(--brass);letter-spacing:.1em;border:1px solid var(--brass);border-radius:999px;padding:1px 7px}
+  .addbook{border-style:dashed;align-items:center;justify-content:center;color:var(--ink-faint);min-height:150px;font-size:14px}
+
+  /* ---------- lists / empty ---------- */
+  .empty{text-align:center;color:var(--ink-faint);font-size:14px;padding:40px 20px;line-height:1.9}
+  .empty .big{font-family:var(--mincho);font-size:17px;color:var(--ink-soft);display:block;margin-bottom:6px}
+  .search{width:100%;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:11px 16px;font-size:15px;margin-bottom:12px}
+  .group-h{font-family:var(--mincho);font-size:13px;letter-spacing:.1em;color:var(--ink-soft);margin:18px 4px 8px}
+
+  /* ---------- bottom nav ---------- */
+  nav.tabs{
+    position:fixed;left:0;right:0;bottom:0;z-index:6;
+    display:flex;max-width:640px;margin:0 auto;
+    background:rgba(239,237,230,.94);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    padding-bottom:var(--safe-bottom);
+  }
+  nav.tabs button{flex:1;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-faint);font-size:10px;letter-spacing:.08em}
+  nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6}
+  nav.tabs button.on{color:var(--indigo)}
+  nav.tabs button.on .lbl{font-weight:700}
+
+  /* ---------- bottom sheet ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(20,26,40,.4);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+  .overlay.on{opacity:1;pointer-events:auto}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:640px;margin:0 auto;
+    background:var(--paper);border-radius:20px 20px 0 0;padding:8px 18px calc(var(--safe-bottom) + 22px);
+    max-height:88dvh;overflow-y:auto;transform:translateY(102%);transition:transform .26s cubic-bezier(.2,.7,.2,1);
+    box-shadow:0 -8px 30px rgba(20,26,40,.2);
+  }
+  .sheet.on{transform:none}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--line-strong);margin:8px auto 12px}
+  .sheet h2{font-family:var(--mincho);font-size:18px;letter-spacing:.08em;margin:2px 0 16px;font-weight:600}
+  .in{width:100%;border:1px solid var(--line-strong);border-radius:10px;background:var(--card);padding:12px 14px;margin-bottom:12px}
+  .in.area{min-height:80px;resize:vertical;font-size:15px}
+  .lbl-in{font-size:11px;letter-spacing:.14em;color:var(--ink-faint);margin:4px 2px 6px}
+  .seg{display:flex;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .seg button{flex:1;padding:10px;font-size:13px;color:var(--ink-soft);background:var(--card)}
+  .seg button.on{background:var(--indigo);color:#fff}
+  .primary{width:100%;background:var(--indigo);color:#fff;font-weight:600;letter-spacing:.06em;padding:14px;border-radius:12px;font-size:15px;margin-top:4px}
+  .primary:active{background:var(--indigo-press)}
+  .ghost{width:100%;background:none;color:var(--ink-soft);padding:12px;font-size:14px;margin-top:4px}
+  .destructive{color:var(--danger);font-size:13px;padding:10px;width:100%;text-align:center}
+  .coverbtn{width:100%;border:1px dashed var(--line-strong);border-radius:12px;background:var(--card);padding:0;overflow:hidden;margin-bottom:12px;aspect-ratio:16/7;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:14px;position:relative}
+  .coverbtn img{width:100%;height:100%;object-fit:cover}
+  .picklist{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+  .pickitem{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;width:100%}
+  .pickitem .cover{width:30px;height:42px;border-radius:4px;object-fit:cover;background:var(--indigo);flex:none;display:flex;align-items:center;justify-content:center;color:var(--paper);font-family:var(--mincho);font-size:15px}
+  .pickitem .nm{font-family:var(--mincho);font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pickitem.on{border-color:var(--brass)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(var(--safe-bottom) + 140px);transform:translateX(-50%) translateY(10px);
+    background:var(--ink);color:var(--paper);font-size:13px;letter-spacing:.05em;padding:10px 18px;border-radius:999px;
+    z-index:40;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+
+  .link{color:var(--indigo);text-decoration:underline;font-size:13px}
+  .hint{font-size:12px;color:var(--ink-faint);line-height:1.8}
+  hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <span class="brand">栞</span>
+    <span class="brand-sub">SHIORI</span>
+  </header>
+
+  <main>
+    <!-- ============ 記録 ============ -->
+    <section class="view" id="v-capture">
+      <button class="bookpick" id="bookpick">
+        <span class="cover" id="bp-cover">栞</span>
+        <span class="meta">
+          <span class="label">いま読んでいる本</span>
+          <span class="name" id="bp-name">本を選ぶ</span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+
+      <textarea class="paste-area" id="passage" placeholder="気になった一節をここに貼り付け。&#10;スマホのテキスト認識でコピーした文章を貼ると、改行や余分な空白を自動で整えます。"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="tinybtn" id="btn-clip">クリップボードから貼り付け</button>
+        <button class="tinybtn" id="btn-clean">整形しなおす</button>
+        <button class="tinybtn" id="btn-clear">消す</button>
+      </div>
+
+      <textarea class="note" id="note" placeholder="ひとことメモ（なぜ心に留めたか・任意）"></textarea>
+
+      <div class="field-label" id="chap-label" hidden>章</div>
+      <div class="chips" id="chap-chips" hidden></div>
+
+      <div class="field-label">タグ</div>
+      <div class="chips" id="tag-chips"></div>
+
+      <button class="save" id="btn-save">栞をはさむ</button>
+    </section>
+
+    <!-- ============ 本棚 ============ -->
+    <section class="view" id="v-shelf" hidden>
+      <div class="view-title">本棚</div>
+      <div class="shelf" id="shelf"></div>
+    </section>
+
+    <!-- ============ 本の詳細 ============ -->
+    <section class="view" id="v-book" hidden>
+      <button class="link" id="back-shelf" style="margin-bottom:12px">‹ 本棚へ</button>
+      <div id="book-detail"></div>
+    </section>
+
+    <!-- ============ 見返す ============ -->
+    <section class="view" id="v-review" hidden>
+      <div class="view-title">見返す</div>
+      <div id="today-wrap"></div>
+      <input class="search" id="search" placeholder="本文・メモを検索">
+      <div class="chips" id="filter-tags" style="margin-bottom:6px"></div>
+      <div id="review-list"></div>
+    </section>
+
+    <!-- ============ 設定 ============ -->
+    <section class="view" id="v-settings" hidden>
+      <div class="view-title">設定</div>
+      <div class="card">
+        <div style="font-family:var(--mincho);font-size:15px;margin-bottom:6px">データの持ち出し・引き継ぎ</div>
+        <p class="hint">メモはこの端末の中だけに保存されます。機種変更や共有のときは、ここで書き出したファイルを渡してください。</p>
+        <div class="row" style="margin-top:12px">
+          <button class="tinybtn" id="btn-export">書き出す（.json）</button>
+          <button class="tinybtn" id="btn-import">読み込む</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--mincho);font-size:15px;margin-bottom:6px">ホーム画面に追加</div>
+        <p class="hint">ブラウザの共有メニューから「ホーム画面に追加」を選ぶと、アプリのように起動でき、電波がなくても使えます。</p>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--mincho);font-size:15px;margin-bottom:6px">栞について</div>
+        <p class="hint">読書中に出会った良い一節を、栞をはさむように書き留めておくための小さな道具です。要約はせず、原文とひとことを残します。<span id="stat"></span></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="capture" class="on"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h10M4 19h7"/></svg><span class="lbl">記録</span></button>
+    <button data-tab="shelf"><svg viewBox="0 0 24 24"><path d="M5 4h4v16H5zM11 4h3l3 15-4 1zM4 20h16"/></svg><span class="lbl">本棚</span></button>
+    <button data-tab="review"><svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6zM9 4v4h6"/><path d="M9 13h6M9 16h4"/></svg><span class="lbl">見返す</span></button>
+    <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg><span class="lbl">設定</span></button>
+  </nav>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div id="sheet-body"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ========================================================================
+   栞 (Shiori) — 読書メモ PWA / 単一ファイル・オフライン・端末内保存
+   ===================================================================== */
+
+/* ---------- tiny IndexedDB wrapper ---------- */
+const DB = (() => {
+  let dbp;
+  function open(){
+    if(dbp) return dbp;
+    dbp = new Promise((res,rej)=>{
+      const r = indexedDB.open("shiori", 1);
+      r.onupgradeneeded = e => {
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains("books")) db.createObjectStore("books",{keyPath:"id"});
+        if(!db.objectStoreNames.contains("entries")) db.createObjectStore("entries",{keyPath:"id"});
+        if(!db.objectStoreNames.contains("meta")) db.createObjectStore("meta",{keyPath:"key"});
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return dbp;
+  }
+  async function tx(store, mode, fn){
+    const db = await open();
+    return new Promise((res,rej)=>{
+      const t = db.transaction(store, mode);
+      const s = t.objectStore(store);
+      let out;
+      Promise.resolve(fn(s)).then(v=>out=v);
+      t.oncomplete = () => res(out);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
+  }
+  const req = r => new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+  return {
+    getAll:(store)=>tx(store,"readonly",s=>req(s.getAll())),
+    get:(store,key)=>tx(store,"readonly",s=>req(s.get(key))),
+    put:(store,val)=>tx(store,"readwrite",s=>req(s.put(val))),
+    del:(store,key)=>tx(store,"readwrite",s=>req(s.delete(key))),
+    clear:(store)=>tx(store,"readwrite",s=>req(s.clear())),
+  };
+})();
+
+/* ---------- state ---------- */
+const state = { books:[], entries:[], currentBookId:null, view:"capture",
+  draft:{chapter:null, tags:[]}, viewingBookId:null, filterTag:null, search:"" };
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- text cleanup (ルールベース整形) ----------
+   OCR/カメラ認識テキストのゴミ取り:
+   - 英単語の行末ハイフン分割を連結
+   - 段落内の不要な改行を連結（日本語は空白なし、英語は空白あり）
+   - 連続する空白・空行を圧縮
+   - 全角英数字を半角へ（記号・かなはそのまま）
+*/
+function isCJK(ch){ return ch && /[\u3040-\u30FF\u3400-\u9FFF\uFF66-\uFF9F。、」』）]/.test(ch); }
+function toHalfWidth(s){
+  return s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+          .replace(/\u3000/g," ");
+}
+function cleanText(input){
+  if(!input) return "";
+  let t = input.replace(/\r\n?/g,"\n");
+  t = toHalfWidth(t);
+  // 行末ハイフンで割れた英単語を連結
+  t = t.replace(/([A-Za-z])-\n([A-Za-z])/g, "$1$2");
+  const rawLines = t.split("\n").map(l=>l.replace(/[ \t]+/g," ").trim());
+  const out = [];
+  let buf = "";
+  const flush = ()=>{ if(buf.trim()) out.push(buf.trim()); buf=""; };
+  for(const line of rawLines){
+    if(line === ""){ flush(); continue; }      // 空行 = 段落の区切り
+    if(buf === ""){ buf = line; continue; }
+    const prev = buf[buf.length-1];
+    const next = line[0];
+    if(isCJK(prev) || isCJK(next)) buf += line;        // 和文は詰めて連結
+    else buf += " " + line;                             // 欧文は空白で連結
+  }
+  flush();
+  let r = out.join("\n\n").replace(/ {2,}/g," ");
+  // 和文どうしの間に残った空白を除去（OCRで挟まりがち）
+  let prev;
+  do { prev=r; r=r.replace(/([\u3040-\u30FF\u3400-\u9FFF])\s+([\u3040-\u30FF\u3400-\u9FFF])/g,"$1$2"); } while(r!==prev);
+  return r.trim();
+}
+
+/* ---------- date format ---------- */
+function fmtDate(ts){
+  const d = new Date(ts), n = new Date();
+  const y=d.getFullYear(), mo=d.getMonth()+1, da=d.getDate();
+  const hh=String(d.getHours()).padStart(2,"0"), mm=String(d.getMinutes()).padStart(2,"0");
+  const sameYear = y===n.getFullYear();
+  return (sameYear? "" : y+"年") + mo+"月"+da+"日 "+hh+":"+mm;
+}
+
+/* ---------- load & persist ---------- */
+async function loadAll(){
+  const [books, entries, cur] = await Promise.all([
+    DB.getAll("books"), DB.getAll("entries"), DB.get("meta","currentBookId")
+  ]);
+  state.books = books.sort((a,b)=>b.createdAt-a.createdAt);
+  state.entries = entries.sort((a,b)=>b.createdAt-a.createdAt);
+  state.currentBookId = cur ? cur.value : (state.books[0]?.id ?? null);
+}
+const setCurrentBook = async id => { state.currentBookId=id; await DB.put("meta",{key:"currentBookId",value:id}); };
+const bookById = id => state.books.find(b=>b.id===id);
+const entriesOfBook = id => state.entries.filter(e=>e.bookId===id);
+const allTags = () => [...new Set(state.entries.flatMap(e=>e.tags||[]))];
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const el=$("toast"); el.textContent=msg; el.classList.add("on");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("on"),1800);
+}
+
+/* ---------- bottom sheet ---------- */
+function openSheet(html){
+  $("sheet-body").innerHTML = html;
+  $("overlay").classList.add("on"); $("sheet").classList.add("on");
+}
+function closeSheet(){
+  $("overlay").classList.remove("on"); $("sheet").classList.remove("on");
+}
+$("overlay").addEventListener("click", closeSheet);
+
+/* ---------- image downscale for covers ---------- */
+function fileToCover(file){
+  return new Promise((res)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=640, scale=Math.min(1, max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg",0.72));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);res(null)};
+    img.src=url;
+  });
+}
+
+/* =======================================================================
+   RENDER
+   ==================================================================== */
+function render(){
+  renderCapture();
+  if(state.view==="shelf") renderShelf();
+  if(state.view==="book") renderBookDetail();
+  if(state.view==="review") renderReview();
+  if(state.view==="settings") renderSettings();
+}
+
+/* -------- 記録 -------- */
+function coverInitial(b){ return b && b.title ? b.title.trim().slice(0,1) : "栞"; }
+function renderCapture(){
+  const b = bookById(state.currentBookId);
+  const cov=$("bp-cover"), name=$("bp-name");
+  if(b){
+    name.textContent = b.title;
+    if(b.cover){ cov.style.backgroundImage=`url(${b.cover})`; cov.style.backgroundSize="cover"; cov.textContent=""; }
+    else { cov.style.backgroundImage=""; cov.textContent=coverInitial(b); }
+  } else { name.textContent="本を選ぶ"; cov.style.backgroundImage=""; cov.textContent="栞"; }
+
+  // chapters
+  const chapWrap=$("chap-chips"), chapLabel=$("chap-label");
+  const chaps = b && b.chapters && b.chapters.length ? b.chapters : [];
+  if(chaps.length){
+    chapLabel.hidden=false; chapWrap.hidden=false;
+    chapWrap.innerHTML = chaps.map(c=>
+      `<button class="chip ${state.draft.chapter===c?"on":""}" data-chap="${esc(c)}">${esc(c)}</button>`).join("");
+  } else { chapLabel.hidden=true; chapWrap.hidden=true; }
+
+  // tags: existing + add
+  const tagWrap=$("tag-chips");
+  const tags=allTags();
+  tagWrap.innerHTML =
+    tags.map(t=>`<button class="chip ${state.draft.tags.includes(t)?"on":""}" data-tag="${esc(t)}">${esc(t)}</button>`).join("")
+    + `<button class="chip add" id="tag-add">＋ タグ</button>`;
+
+  const hasText = $("passage").value.trim().length>0;
+  $("btn-save").disabled = !(hasText && state.currentBookId);
+}
+
+/* -------- 本棚 -------- */
+function renderShelf(){
+  const el=$("shelf");
+  const cards = state.books.map(b=>{
+    const cnt = entriesOfBook(b.id).length;
+    const now = b.id===state.currentBookId ? `<span class="now">記録中</span>` : "";
+    const cover = b.cover
+      ? `<div class="cover" style="background-image:url(${b.cover});background-size:cover"></div>`
+      : `<div class="cover">${esc(coverInitial(b))}</div>`;
+    return `<button class="book" data-book="${b.id}">
+      ${cover}
+      <div class="bt">${esc(b.title)}</div>
+      <div class="ba">${esc(b.author||"")}</div>
+      <div class="bc">${cnt}件 ${now}</div>
+    </button>`;
+  }).join("");
+  el.innerHTML = cards + `<button class="book addbook" id="add-book">＋<br>本を追加</button>`;
+}
+
+/* -------- 本の詳細 -------- */
+function renderBookDetail(){
+  const b = bookById(state.viewingBookId);
+  const host=$("book-detail");
+  if(!b){ host.innerHTML=`<div class="empty">本が見つかりません</div>`; return; }
+  const list = entriesOfBook(b.id);
+  const isNow = b.id===state.currentBookId;
+  const cover = b.cover
+    ? `<div class="cover" style="width:56px;height:78px;border-radius:6px;background:url(${b.cover});background-size:cover"></div>`
+    : `<div class="cover" style="width:56px;height:78px;border-radius:6px;background:var(--indigo);display:flex;align-items:center;justify-content:center;color:var(--paper);font-family:var(--mincho);font-size:22px">${esc(coverInitial(b))}</div>`;
+
+  let body = `<div class="card" style="display:flex;gap:14px;align-items:flex-start">
+    ${cover}
+    <div style="flex:1;min-width:0">
+      <div style="font-family:var(--mincho);font-size:18px;line-height:1.4">${esc(b.title)}</div>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">${esc(b.author||"")}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">${list.length}件 ・ ${b.status==="done"?"読了":"読書中"}</div>
+      <div class="row" style="margin-top:12px">
+        ${isNow?`<span class="tinybtn" style="border-color:var(--brass);color:var(--brass)">記録中</span>`
+                :`<button class="tinybtn" id="d-setcur">この本を記録対象にする</button>`}
+        <button class="tinybtn" id="d-edit">編集</button>
+      </div>
+    </div>
+  </div>`;
+
+  if(!list.length){
+    body += `<div class="empty"><span class="big">まだ栞がありません</span>この本を読みながら、良い一節を書き留めましょう。</div>`;
+  } else {
+    // group by chapter (章順があれば章順、なければ時系列)
+    const groups = new Map();
+    for(const e of list){ const k=e.chapter||"（章なし）"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); }
+    const order = (b.chapters&&b.chapters.length)? [...b.chapters,"（章なし）"] : [...groups.keys()];
+    for(const k of order){
+      const arr=groups.get(k); if(!arr) continue;
+      body += `<div class="group-h">${esc(k)}</div>`;
+      body += arr.map(entryCard).join("");
+    }
+  }
+  host.innerHTML = body;
+}
+
+/* -------- entry card (共通) -------- */
+function entryCard(e, opts={}){
+  const b = bookById(e.bookId);
+  const tags = (e.tags||[]).map(t=>`<span class="tag">#${esc(t)}</span>`).join(" ");
+  const meta = [
+    opts.showBook && b ? esc(b.title) : "",
+    e.chapter ? esc(e.chapter) : "",
+    fmtDate(e.createdAt)
+  ].filter(Boolean).join("　·　");
+  return `<button class="card" data-entry="${e.id}" style="display:block;width:100%;text-align:left">
+    <div class="passage mark">${esc(e.text)}</div>
+    ${e.note?`<div class="entry-note">${esc(e.note)}</div>`:""}
+    <div class="entry-meta">${esc0(meta)} ${tags}</div>
+  </button>`;
+}
+function esc0(s){ return s; } // meta already escaped piecewise
+
+/* -------- 見返す -------- */
+let todayEntry=null;
+function pickToday(){
+  const pool=state.entries;
+  todayEntry = pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+}
+function renderReview(){
+  if(!todayEntry || !state.entries.find(e=>e.id===todayEntry.id)) pickToday();
+  const tw=$("today-wrap");
+  if(todayEntry){
+    const b=bookById(todayEntry.bookId);
+    tw.innerHTML = `<div class="card today">
+      <div class="kicker">今日の一節</div>
+      <div class="passage mark">${esc(todayEntry.text)}</div>
+      ${todayEntry.note?`<div class="entry-note">${esc(todayEntry.note)}</div>`:""}
+      <div class="entry-meta">${b?esc(b.title):""}　·　${fmtDate(todayEntry.createdAt)}</div>
+      <div class="row" style="margin-top:12px"><button class="tinybtn" id="reshuffle">別の一節</button></div>
+    </div>`;
+  } else tw.innerHTML="";
+
+  // tag filter chips
+  const tags=allTags(), ft=$("filter-tags");
+  ft.innerHTML = tags.length
+    ? tags.map(t=>`<button class="chip ${state.filterTag===t?"on":""}" data-ftag="${esc(t)}">#${esc(t)}</button>`).join("")
+    : "";
+
+  // list
+  let list=state.entries;
+  if(state.filterTag) list=list.filter(e=>(e.tags||[]).includes(state.filterTag));
+  if(state.search){
+    const q=state.search.toLowerCase();
+    list=list.filter(e=>(e.text+" "+(e.note||"")).toLowerCase().includes(q));
+  }
+  const host=$("review-list");
+  if(!state.entries.length){
+    host.innerHTML=`<div class="empty"><span class="big">栞はまだありません</span>「記録」から最初の一節を書き留めてみましょう。</div>`;
+  } else if(!list.length){
+    host.innerHTML=`<div class="empty">該当する栞がありません</div>`;
+  } else {
+    host.innerHTML = list.map(e=>entryCard(e,{showBook:true})).join("");
+  }
+}
+
+/* -------- 設定 -------- */
+function renderSettings(){
+  $("stat").textContent = ` 現在 ${state.books.length}冊・${state.entries.length}件。`;
+}
+
+/* =======================================================================
+   ACTIONS
+   ==================================================================== */
+
+/* --- tab nav --- */
+function switchView(v){
+  state.view=v;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===v));
+  ["capture","shelf","book","review","settings"].forEach(id=>{
+    $("v-"+id).hidden = (id!==v);
+  });
+  render();
+}
+document.querySelectorAll("nav.tabs button").forEach(btn=>{
+  btn.addEventListener("click",()=>switchView(btn.dataset.tab));
+});
+
+/* --- passage input --- */
+$("passage").addEventListener("paste",(e)=>{
+  const t=(e.clipboardData||window.clipboardData).getData("text");
+  if(t){ e.preventDefault(); const c=cleanText(t);
+    const ta=$("passage"); ta.value = ta.value ? ta.value+"\n\n"+c : c;
+    ta.dataset.raw=t; render(); }
+});
+$("passage").addEventListener("input",()=>{ $("btn-save").disabled=!( $("passage").value.trim() && state.currentBookId); });
+
+$("btn-clip").addEventListener("click", async ()=>{
+  try{
+    const t=await navigator.clipboard.readText();
+    if(!t){ toast("クリップボードが空です"); return; }
+    const ta=$("passage"), c=cleanText(t);
+    ta.value = ta.value ? ta.value+"\n\n"+c : c; ta.dataset.raw=t; render();
+  }catch(_){ toast("貼り付けできません。枠内に直接ペーストしてください"); }
+});
+$("btn-clean").addEventListener("click",()=>{ const ta=$("passage"); ta.value=cleanText(ta.value); });
+$("btn-clear").addEventListener("click",()=>{ $("passage").value=""; $("passage").dataset.raw=""; render(); });
+
+/* --- chapter / tag chips --- */
+$("chap-chips").addEventListener("click",e=>{
+  const c=e.target.closest("[data-chap]"); if(!c) return;
+  const v=c.dataset.chap;
+  state.draft.chapter = state.draft.chapter===v ? null : v;
+  renderCapture();
+});
+$("tag-chips").addEventListener("click",e=>{
+  const add=e.target.closest("#tag-add");
+  if(add){ promptNewTag(); return; }
+  const c=e.target.closest("[data-tag]"); if(!c) return;
+  const v=c.dataset.tag;
+  const i=state.draft.tags.indexOf(v);
+  if(i>=0) state.draft.tags.splice(i,1); else state.draft.tags.push(v);
+  renderCapture();
+});
+function promptNewTag(){
+  openSheet(`<h2>タグを追加</h2>
+    <input class="in" id="newtag" placeholder="例：文章術 / 生き方 / 引用" autocomplete="off">
+    <button class="primary" id="newtag-ok">追加する</button>`);
+  setTimeout(()=>$("newtag").focus(),120);
+  $("newtag-ok").addEventListener("click",()=>{
+    const v=$("newtag").value.trim();
+    if(v && !state.draft.tags.includes(v)) state.draft.tags.push(v);
+    closeSheet(); renderCapture();
+  });
+  $("newtag").addEventListener("keydown",ev=>{ if(ev.key==="Enter") $("newtag-ok").click(); });
+}
+
+/* --- save entry --- */
+$("btn-save").addEventListener("click", async ()=>{
+  const text=$("passage").value.trim();
+  if(!text){ toast("本文がありません"); return; }
+  if(!state.currentBookId){ toast("先に本を選んでください"); openBookPicker(); return; }
+  const entry={
+    id:uid(), bookId:state.currentBookId, text,
+    raw:$("passage").dataset.raw||text, note:$("note").value.trim(),
+    chapter:state.draft.chapter, tags:[...state.draft.tags], createdAt:Date.now()
+  };
+  await DB.put("entries",entry);
+  await loadAll();
+  // reset text & note & tags, keep book & chapter (連続入力向け)
+  $("passage").value=""; $("passage").dataset.raw=""; $("note").value=""; state.draft.tags=[];
+  render();
+  toast("栞をはさみました");
+});
+
+/* --- book picker sheet --- */
+function openBookPicker(){
+  const items = state.books.map(b=>{
+    const cov=b.cover?`<span class="cover" style="background:url(${b.cover});background-size:cover"></span>`
+                     :`<span class="cover">${esc(coverInitial(b))}</span>`;
+    return `<button class="pickitem ${b.id===state.currentBookId?"on":""}" data-pick="${b.id}">
+      ${cov}<span class="nm">${esc(b.title)}</span>
+      ${b.id===state.currentBookId?'<span style="color:var(--brass);font-size:12px">記録中</span>':""}</button>`;
+  }).join("");
+  openSheet(`<h2>どの本を記録する？</h2>
+    <div class="picklist">${items||'<p class="hint">まだ本がありません。</p>'}</div>
+    <button class="primary" id="pick-add">＋ 新しい本を追加</button>`);
+  $("sheet-body").querySelectorAll("[data-pick]").forEach(el=>{
+    el.addEventListener("click", async ()=>{
+      await setCurrentBook(el.dataset.pick);
+      state.draft.chapter=null;
+      closeSheet(); render();
+    });
+  });
+  $("pick-add").addEventListener("click",()=>openBookForm());
+}
+$("bookpick").addEventListener("click",openBookPicker);
+
+/* --- book form (add / edit) --- */
+function openBookForm(existing){
+  const b = existing||{title:"",author:"",cover:null,chapters:[],status:"reading"};
+  openSheet(`<h2>${existing?"本を編集":"本を追加"}</h2>
+    <button class="coverbtn" id="cov-btn">${b.cover?`<img src="${b.cover}">`:"＋ 表紙を撮る / 選ぶ"}</button>
+    <input type="file" id="cov-file" accept="image/*" capture="environment" hidden>
+    <div class="lbl-in">タイトル</div>
+    <input class="in" id="f-title" value="${esc(b.title)}" placeholder="本のタイトル">
+    <div class="lbl-in">著者（任意）</div>
+    <input class="in" id="f-author" value="${esc(b.author||"")}" placeholder="著者名">
+    <div class="lbl-in">章（任意・1行に1つ）</div>
+    <textarea class="in area" id="f-chaps" placeholder="第一章 ○○&#10;第二章 ○○">${esc((b.chapters||[]).join("\n"))}</textarea>
+    <div class="lbl-in">状態</div>
+    <div class="seg" id="f-status">
+      <button data-st="reading" class="${b.status!=="done"?"on":""}">読書中</button>
+      <button data-st="done" class="${b.status==="done"?"on":""}">読了</button>
+    </div>
+    <button class="primary" id="book-save">${existing?"保存する":"この本を追加"}</button>
+    ${existing?`<button class="destructive" id="book-del">この本とメモを削除</button>`:""}`);
+
+  let coverData=b.cover, status=b.status||"reading";
+  $("cov-btn").addEventListener("click",()=>$("cov-file").click());
+  $("cov-file").addEventListener("change", async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    coverData=await fileToCover(f);
+    $("cov-btn").innerHTML = coverData?`<img src="${coverData}">`:"＋ 表紙を撮る / 選ぶ";
+  });
+  $("f-status").querySelectorAll("[data-st]").forEach(el=>el.addEventListener("click",()=>{
+    status=el.dataset.st;
+    $("f-status").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===el));
+  }));
+  $("book-save").addEventListener("click", async ()=>{
+    const title=$("f-title").value.trim();
+    if(!title){ toast("タイトルを入れてください"); return; }
+    const chapters=$("f-chaps").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    const rec={ id: existing?b.id:uid(), title, author:$("f-author").value.trim(),
+      cover:coverData||null, chapters, status,
+      createdAt: existing?b.createdAt:Date.now() };
+    await DB.put("books",rec);
+    if(!existing) await setCurrentBook(rec.id);
+    await loadAll(); closeSheet(); render();
+    toast(existing?"保存しました":"本を追加しました");
+  });
+  if(existing){
+    $("book-del").addEventListener("click", async ()=>{
+      if(!confirm("この本と、ひもづく全てのメモを削除します。よろしいですか？")) return;
+      for(const e of entriesOfBook(b.id)) await DB.del("entries",e.id);
+      await DB.del("books",b.id);
+      if(state.currentBookId===b.id) await setCurrentBook(state.books.find(x=>x.id!==b.id)?.id||null);
+      await loadAll(); closeSheet();
+      state.view="shelf"; switchView("shelf");
+      toast("削除しました");
+    });
+  }
+}
+
+/* --- shelf interactions --- */
+$("shelf").addEventListener("click",e=>{
+  if(e.target.closest("#add-book")){ openBookForm(); return; }
+  const bk=e.target.closest("[data-book]"); if(!bk) return;
+  state.viewingBookId=bk.dataset.book; switchView("book");
+});
+$("back-shelf").addEventListener("click",()=>switchView("shelf"));
+
+/* --- book detail interactions (delegated) --- */
+$("book-detail").addEventListener("click", async e=>{
+  if(e.target.closest("#d-setcur")){ await setCurrentBook(state.viewingBookId); render(); toast("記録する本にしました"); return; }
+  if(e.target.closest("#d-edit")){ openBookForm(bookById(state.viewingBookId)); return; }
+  const en=e.target.closest("[data-entry]"); if(en){ openEntry(en.dataset.entry); }
+});
+
+/* --- entry view / edit --- */
+function openEntry(id){
+  const e=state.entries.find(x=>x.id===id); if(!e) return;
+  const b=bookById(e.bookId);
+  const chaps = b&&b.chapters&&b.chapters.length ? b.chapters : [];
+  openSheet(`<h2>栞</h2>
+    <div class="lbl-in">本文</div>
+    <textarea class="in area" id="e-text" style="min-height:120px;font-family:var(--mincho);font-size:16px">${esc(e.text)}</textarea>
+    <div class="lbl-in">ひとことメモ</div>
+    <textarea class="in area" id="e-note" placeholder="任意">${esc(e.note||"")}</textarea>
+    ${chaps.length?`<div class="lbl-in">章</div><div class="chips" id="e-chaps">
+      ${chaps.map(c=>`<button class="chip ${e.chapter===c?"on":""}" data-ec="${esc(c)}">${esc(c)}</button>`).join("")}
+    </div>`:""}
+    <div class="lbl-in" style="margin-top:12px">タグ</div>
+    <div class="chips" id="e-tags">
+      ${allTags().map(t=>`<button class="chip ${(e.tags||[]).includes(t)?"on":""}" data-et="${esc(t)}">${esc(t)}</button>`).join("")}
+      <button class="chip add" id="e-tag-add">＋</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink-faint);margin:12px 2px">${b?esc(b.title):""} ・ ${fmtDate(e.createdAt)}</div>
+    <button class="primary" id="e-save">保存する</button>
+    <button class="destructive" id="e-del">この栞を削除</button>`);
+
+  let chapter=e.chapter, tags=[...(e.tags||[])];
+  const eTags=$("e-tags");
+  const paintTags=()=>{ eTags.querySelectorAll("[data-et]").forEach(el=>el.classList.toggle("on",tags.includes(el.dataset.et))); };
+  if($("e-chaps")) $("e-chaps").addEventListener("click",ev=>{
+    const c=ev.target.closest("[data-ec]"); if(!c) return;
+    chapter = chapter===c.dataset.ec ? null : c.dataset.ec;
+    $("e-chaps").querySelectorAll("[data-ec]").forEach(el=>el.classList.toggle("on",el.dataset.ec===chapter));
+  });
+  eTags.addEventListener("click",ev=>{
+    if(ev.target.closest("#e-tag-add")){
+      const v=prompt("新しいタグ"); if(v&&v.trim()){ const t=v.trim(); if(!tags.includes(t))tags.push(t);
+        if(![...eTags.querySelectorAll("[data-et]")].some(x=>x.dataset.et===t)){
+          const btn=document.createElement("button"); btn.className="chip on"; btn.dataset.et=t; btn.textContent=t;
+          eTags.insertBefore(btn,$("e-tag-add"));
+        } paintTags(); }
+      return;
+    }
+    const c=ev.target.closest("[data-et]"); if(!c) return;
+    const v=c.dataset.et; const i=tags.indexOf(v); if(i>=0)tags.splice(i,1); else tags.push(v);
+    paintTags();
+  });
+  $("e-save").addEventListener("click", async ()=>{
+    e.text=$("e-text").value.trim(); e.note=$("e-note").value.trim();
+    e.chapter=chapter; e.tags=tags;
+    if(!e.text){ toast("本文がありません"); return; }
+    await DB.put("entries",e); await loadAll(); closeSheet(); render(); toast("保存しました");
+  });
+  $("e-del").addEventListener("click", async ()=>{
+    if(!confirm("この栞を削除します。よろしいですか？")) return;
+    await DB.del("entries",id); await loadAll(); closeSheet(); render(); toast("削除しました");
+  });
+}
+
+/* --- review interactions --- */
+$("today-wrap").addEventListener("click",e=>{ if(e.target.closest("#reshuffle")){ pickToday(); renderReview(); } });
+$("review-list").addEventListener("click",e=>{ const en=e.target.closest("[data-entry]"); if(en) openEntry(en.dataset.entry); });
+$("filter-tags").addEventListener("click",e=>{
+  const c=e.target.closest("[data-ftag]"); if(!c) return;
+  state.filterTag = state.filterTag===c.dataset.ftag ? null : c.dataset.ftag;
+  renderReview();
+});
+$("search").addEventListener("input",e=>{ state.search=e.target.value; renderReview(); });
+
+/* --- export / import --- */
+$("btn-export").addEventListener("click", async ()=>{
+  const data={ app:"shiori", version:1, exportedAt:Date.now(),
+    books:state.books, entries:state.entries, currentBookId:state.currentBookId };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  const d=new Date(), pad=n=>String(n).padStart(2,"0");
+  a.href=url; a.download=`shiori-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+  a.click(); URL.revokeObjectURL(url);
+});
+$("btn-import").addEventListener("click",()=>$("import-file").click());
+$("import-file").addEventListener("change", async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!data.books||!data.entries) throw 0;
+    if(!confirm(`本 ${data.books.length}冊・メモ ${data.entries.length}件 を読み込みます。同じIDは上書きされます。`)) return;
+    for(const b of data.books) await DB.put("books",b);
+    for(const en of data.entries) await DB.put("entries",en);
+    await loadAll(); render(); toast("読み込みました");
+  }catch(_){ toast("読み込めませんでした"); }
+  e.target.value="";
+});
+
+/* =======================================================================
+   BOOT
+   ==================================================================== */
+(async function(){
+  await loadAll();
+  switchView("capture");
+  if("serviceWorker" in navigator){
+    try{ await navigator.serviceWorker.register("sw.js"); }catch(_){}
+  }
+})();
+</script>
+</body>
+</html>
