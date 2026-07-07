@@ -29,6 +29,8 @@
     --gothic:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",system-ui,sans-serif;
     --safe-bottom:env(safe-area-inset-bottom,0px);
     --safe-top:env(safe-area-inset-top,0px);
+    --rfs:17px;
+    --rfs-note:13px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -119,27 +121,34 @@
   .save:active{background:var(--indigo-press)}
   .save[disabled]{opacity:.4}
 
-  /* ---------- Passage display + highlighter signature ---------- */
-  .passage{font-family:var(--mincho);font-size:17px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
-  .passage.mark{ /* マーカー装飾は削除済み(ユーザー設定によりプレーン表示) */ }
-  .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
+  /* ---------- Passage display ---------- */
+  .passage{font-family:var(--mincho);font-size:var(--rfs,17px);color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
   .entry-meta .tag{color:var(--indigo)}
-  .entry-note{font-size:13px;color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
+  .entry-note{font-size:var(--rfs-note,13px);color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
   .imgstrip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .imgstrip .th{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}
   .imgstrip .th img{width:100%;height:100%;object-fit:cover;display:block}
   .imgstrip .th .rm{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
     background:rgba(35,49,77,.78);color:#fff;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
   .entry-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-top:10px}
-  .entry-imgs img{width:100%;border-radius:8px;border:1px solid var(--line);display:block}
+  .entry-imgs img{width:100%;border-radius:8px;border:1px solid var(--line);display:block;cursor:zoom-in}
 
-  /* today's passage — 栞 ribbon signature */
-  .today{position:relative;padding-left:26px;overflow:hidden}
-  .today::before{
-    content:"";position:absolute;left:14px;top:-2px;width:10px;height:52px;background:var(--brass);
-    clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
-  }
-  .today .kicker{font-size:11px;letter-spacing:.2em;color:var(--brass);font-weight:700;margin-bottom:10px}
+  /* ---------- entry card foot (meta + reorder + edit) ---------- */
+  .entry-card{position:relative}
+  .entry-foot{display:flex;align-items:center;gap:8px;margin-top:12px}
+  .entry-foot .entry-meta{flex:1;min-width:0}
+  .entry-edit{flex:none;font-size:12px;color:var(--indigo);padding:6px 13px;border:1px solid var(--line-strong);border-radius:999px;background:var(--card)}
+  .entry-edit:active{background:#eef0f4}
+  .reorder-btn{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--line-strong);background:var(--card);font-size:13px;color:var(--ink-soft)}
+  .reorder-btn:active{background:#eef0f4}
+  .reorder-btn[disabled]{opacity:.28}
+  .tinybtn.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+
+  /* ---------- image lightbox ---------- */
+  .lightbox{position:fixed;inset:0;background:rgba(15,20,32,.92);z-index:50;display:none;align-items:center;justify-content:center;padding:24px}
+  .lightbox.on{display:flex}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 
   /* ---------- Book shelf ---------- */
   .shelf{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -158,9 +167,7 @@
   .search{width:100%;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:11px 16px;font-size:15px;margin-bottom:12px}
   .group-h{font-family:var(--mincho);font-size:13px;letter-spacing:.1em;color:var(--ink-soft);margin:18px 4px 8px}
 
-  /* review-only font size control */
-  #v-review .passage{font-size:var(--rfs,17px)}
-  #v-review .entry-note{font-size:var(--rfs-note,13px)}
+  /* font size control (applies globally: book detail + explore) */
   .fs-seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;margin-left:auto}
   .fs-seg button{padding:7px 13px;font-size:12px;color:var(--ink-soft);background:var(--card)}
   .fs-seg button.on{background:var(--indigo);color:#fff}
@@ -271,6 +278,7 @@
     <!-- ============ 本棚 ============ -->
     <section class="view" id="v-shelf" hidden>
       <div class="view-title">本棚</div>
+      <button class="tinybtn" id="open-explore" style="margin-bottom:14px">🔎 タグ・キーワードで探す</button>
       <div class="shelf" id="shelf"></div>
     </section>
 
@@ -280,19 +288,20 @@
       <div id="book-detail"></div>
     </section>
 
-    <!-- ============ 見返す ============ -->
-    <section class="view" id="v-review" hidden>
-      <div class="view-title">見返す</div>
+    <!-- ============ 探す（タグ・キーワード横断） ============ -->
+    <section class="view" id="v-explore" hidden>
+      <button class="link" id="back-shelf-2" style="margin-bottom:12px">‹ 本棚へ</button>
+      <div class="view-title">タグ・キーワードで探す</div>
       <div class="fs-row">
         <div style="flex:1"></div>
         <div class="fs-seg" id="fs-seg">
           <button data-fs="0">大</button><button data-fs="1">中</button><button data-fs="2">小</button>
         </div>
       </div>
-      <div id="today-wrap"></div>
       <input class="search" id="search" placeholder="本文・メモを検索">
+      <div class="chips" id="filter-books" style="margin-bottom:6px"></div>
       <div class="chips" id="filter-tags" style="margin-bottom:6px"></div>
-      <div id="review-list"></div>
+      <div id="explore-list"></div>
     </section>
 
     <!-- ============ 設定 ============ -->
@@ -321,13 +330,13 @@
   <nav class="tabs">
     <button data-tab="capture" class="on"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h10M4 19h7"/></svg><span class="lbl">記録</span></button>
     <button data-tab="shelf"><svg viewBox="0 0 24 24"><path d="M5 4h4v16H5zM11 4h3l3 15-4 1zM4 20h16"/></svg><span class="lbl">本棚</span></button>
-    <button data-tab="review"><svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6zM9 4v4h6"/><path d="M9 13h6M9 16h4"/></svg><span class="lbl">見返す</span></button>
     <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg><span class="lbl">設定</span></button>
   </nav>
 </div>
 
 <div class="overlay" id="overlay"></div>
 <div class="sheet" id="sheet"><div class="grab"></div><div id="sheet-body"></div></div>
+<div class="lightbox" id="lightbox"><img id="lightbox-img" src="" alt=""></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -378,8 +387,14 @@ const DB = (() => {
 
 /* ---------- state ---------- */
 const state = { books:[], entries:[], currentBookId:null, view:"capture",
-  draft:{chapter:null, tags:[], images:[]}, viewingBookId:null, filterTag:null, search:"", reviewFontStep:0 };
+  draft:{chapter:null, tags:[], images:[]}, viewingBookId:null, filterTag:null, filterBook:null,
+  search:"", reviewFontStep:0, reorderMode:false };
 const FONT_STEPS = [ {passage:17,note:13}, {passage:15,note:12}, {passage:13,note:11} ];
+function applyFontStep(){
+  const step = FONT_STEPS[state.reviewFontStep]||FONT_STEPS[0];
+  document.documentElement.style.setProperty("--rfs", step.passage+"px");
+  document.documentElement.style.setProperty("--rfs-note", step.note+"px");
+}
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
 const $ = id => document.getElementById(id);
@@ -489,7 +504,7 @@ function render(){
   renderCapture();
   if(state.view==="shelf") renderShelf();
   if(state.view==="book") renderBookDetail();
-  if(state.view==="review") renderReview();
+  if(state.view==="explore") renderExplore();
   if(state.view==="settings") renderSettings();
 }
 
@@ -551,12 +566,28 @@ function renderShelf(){
   el.innerHTML = cards + `<button class="book addbook" id="add-book">＋<br>本を追加</button>`;
 }
 
+/* -------- 並び順ヘルパー -------- */
+const orderOf = e => (e.order ?? e.createdAt);
+function sortedEntriesForBook(bookId){
+  return entriesOfBook(bookId).slice().sort((x,y)=>orderOf(y)-orderOf(x));
+}
+async function swapEntryOrder(bookId, entryId, delta){
+  const list = sortedEntriesForBook(bookId);
+  const idx = list.findIndex(e=>e.id===entryId);
+  const swapIdx = idx+delta;
+  if(idx<0 || swapIdx<0 || swapIdx>=list.length) return;
+  const a=list[idx], b=list[swapIdx];
+  const tmp=orderOf(a); a.order=orderOf(b); b.order=tmp;
+  await DB.put("entries",a); await DB.put("entries",b);
+  await loadAll(); renderBookDetail();
+}
+
 /* -------- 本の詳細 -------- */
 function renderBookDetail(){
   const b = bookById(state.viewingBookId);
   const host=$("book-detail");
   if(!b){ host.innerHTML=`<div class="empty">本が見つかりません</div>`; return; }
-  const list = entriesOfBook(b.id);
+  const sorted = sortedEntriesForBook(b.id);
   const isNow = b.id===state.currentBookId;
   const cover = b.cover
     ? `<div class="cover" style="width:56px;height:78px;border-radius:6px;background:url(${b.cover});background-size:cover"></div>`
@@ -567,7 +598,7 @@ function renderBookDetail(){
     <div style="flex:1;min-width:0">
       <div style="font-family:var(--mincho);font-size:18px;line-height:1.4">${esc(b.title)}</div>
       <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">${esc(b.author||"")}</div>
-      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">${list.length}件 ・ ${b.status==="done"?"読了":"読書中"}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">${sorted.length}件 ・ ${b.status==="done"?"読了":"読書中"}</div>
       <div class="row" style="margin-top:12px">
         ${isNow?`<span class="tinybtn" style="border-color:var(--brass);color:var(--brass)">記録中</span>`
                 :`<button class="tinybtn" id="d-setcur">この本を記録対象にする</button>`}
@@ -576,17 +607,24 @@ function renderBookDetail(){
     </div>
   </div>`;
 
-  if(!list.length){
+  if(!sorted.length){
     body += `<div class="empty"><span class="big">まだ栞がありません</span>この本を読みながら、良い一節を書き留めましょう。</div>`;
   } else {
-    // group by chapter (章順があれば章順、なければ時系列)
-    const groups = new Map();
-    for(const e of list){ const k=e.chapter||"（章なし）"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); }
-    const order = (b.chapters&&b.chapters.length)? [...b.chapters,"（章なし）"] : [...groups.keys()];
-    for(const k of order){
-      const arr=groups.get(k); if(!arr) continue;
-      body += `<div class="group-h">${esc(k)}</div>`;
-      body += arr.map(entryCard).join("");
+    body += `<div class="row" style="margin:16px 2px 10px">
+      <button class="tinybtn ${state.reorderMode?"on":""}" id="toggle-reorder">${state.reorderMode?"並び替え完了":"並び替え"}</button>
+    </div>`;
+    if(state.reorderMode){
+      body += sorted.map((e,i)=>entryCard(e,{reorder:true, canUp:i>0, canDown:i<sorted.length-1})).join("");
+    } else {
+      // 章ごとにグループ化（章があれば章順、なければ「章なし」1グループ）
+      const groups = new Map();
+      for(const e of sorted){ const k=e.chapter||"（章なし）"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); }
+      const order = (b.chapters&&b.chapters.length)? [...b.chapters,"（章なし）"] : [...groups.keys()];
+      for(const k of order){
+        const arr=groups.get(k); if(!arr) continue;
+        body += `<div class="group-h">${esc(k)}</div>`;
+        body += arr.map(e=>entryCard(e,{})).join("");
+      }
     }
   }
   host.innerHTML = body;
@@ -602,56 +640,42 @@ function entryCard(e, opts={}){
     fmtDate(e.createdAt)
   ].filter(Boolean).join("　·　");
   const imgs=(e.images&&e.images.length)?`<div class="entry-imgs">${e.images.map(s=>`<img src="${s}" loading="lazy">`).join("")}</div>`:"";
-  return `<button class="card" data-entry="${e.id}" style="display:block;width:100%;text-align:left">
-    ${e.text?`<div class="passage mark">${esc(e.text)}</div>`:""}
+  const upBtn = opts.reorder?`<button class="reorder-btn" data-up="${e.id}" ${opts.canUp?"":"disabled"} aria-label="上へ">▲</button>`:"";
+  const downBtn = opts.reorder?`<button class="reorder-btn" data-down="${e.id}" ${opts.canDown?"":"disabled"} aria-label="下へ">▼</button>`:"";
+  return `<div class="card entry-card">
+    ${e.text?`<div class="passage">${esc(e.text)}</div>`:""}
     ${imgs}
     ${e.note?`<div class="entry-note">${esc(e.note)}</div>`:""}
-    <div class="entry-meta">${esc0(meta)} ${tags}</div>
-  </button>`;
+    <div class="entry-foot">
+      <div class="entry-meta">${meta} ${tags}</div>
+      ${upBtn}${downBtn}
+      <button class="entry-edit" data-edit="${e.id}">編集</button>
+    </div>
+  </div>`;
 }
-function esc0(s){ return s; } // meta already escaped piecewise
 
-/* -------- 見返す -------- */
-let todayEntry=null;
-function pickToday(){
-  const pool=state.entries;
-  todayEntry = pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
-}
-function renderReview(){
-  const step = FONT_STEPS[state.reviewFontStep]||FONT_STEPS[0];
-  $("v-review").style.setProperty("--rfs", step.passage+"px");
-  $("v-review").style.setProperty("--rfs-note", step.note+"px");
-  $("fs-seg").querySelectorAll("[data-fs]").forEach(b=>b.classList.toggle("on", +b.dataset.fs===state.reviewFontStep));
+/* -------- 探す（タグ・キーワード横断） -------- */
+function renderExplore(){
+  applyFontStep();
+  $("fs-seg").querySelectorAll("[data-fs]").forEach(bt=>bt.classList.toggle("on", +bt.dataset.fs===state.reviewFontStep));
 
-  if(!todayEntry || !state.entries.find(e=>e.id===todayEntry.id)) pickToday();
-  const tw=$("today-wrap");
-  if(todayEntry){
-    const b=bookById(todayEntry.bookId);
-    const tImgs=(todayEntry.images&&todayEntry.images.length)?`<div class="entry-imgs">${todayEntry.images.map(s=>`<img src="${s}">`).join("")}</div>`:"";
-    tw.innerHTML = `<div class="card today">
-      <div class="kicker">今日の一節</div>
-      ${todayEntry.text?`<div class="passage mark">${esc(todayEntry.text)}</div>`:""}
-      ${tImgs}
-      ${todayEntry.note?`<div class="entry-note">${esc(todayEntry.note)}</div>`:""}
-      <div class="entry-meta">${b?esc(b.title):""}　·　${fmtDate(todayEntry.createdAt)}</div>
-      <div class="row" style="margin-top:12px"><button class="tinybtn" id="reshuffle">別の一節</button></div>
-    </div>`;
-  } else tw.innerHTML="";
+  const fb=$("filter-books");
+  fb.innerHTML = state.books.map(bk=>
+    `<button class="chip ${state.filterBook===bk.id?"on":""}" data-fbook="${bk.id}">${esc(bk.title)}</button>`).join("");
 
-  // tag filter chips
   const tags=allTags(), ft=$("filter-tags");
   ft.innerHTML = tags.length
     ? tags.map(t=>`<button class="chip ${state.filterTag===t?"on":""}" data-ftag="${esc(t)}">#${esc(t)}</button>`).join("")
     : "";
 
-  // list
   let list=state.entries;
+  if(state.filterBook) list=list.filter(e=>e.bookId===state.filterBook);
   if(state.filterTag) list=list.filter(e=>(e.tags||[]).includes(state.filterTag));
   if(state.search){
     const q=state.search.toLowerCase();
     list=list.filter(e=>(e.text+" "+(e.note||"")).toLowerCase().includes(q));
   }
-  const host=$("review-list");
+  const host=$("explore-list");
   if(!state.entries.length){
     host.innerHTML=`<div class="empty"><span class="big">栞はまだありません</span>「記録」から最初の一節を書き留めてみましょう。</div>`;
   } else if(!list.length){
@@ -660,6 +684,11 @@ function renderReview(){
     host.innerHTML = list.map(e=>entryCard(e,{showBook:true})).join("");
   }
 }
+
+/* -------- image lightbox -------- */
+function openLightbox(src){ $("lightbox-img").src=src; $("lightbox").classList.add("on"); }
+function closeLightbox(){ $("lightbox").classList.remove("on"); $("lightbox-img").src=""; }
+$("lightbox").addEventListener("click",closeLightbox);
 
 /* -------- 設定 -------- */
 function renderSettings(){
@@ -673,8 +702,9 @@ function renderSettings(){
 /* --- tab nav --- */
 function switchView(v){
   state.view=v;
-  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===v));
-  ["capture","shelf","book","review","settings"].forEach(id=>{
+  const navKey = (v==="book"||v==="explore") ? "shelf" : v;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===navKey));
+  ["capture","shelf","book","explore","settings"].forEach(id=>{
     $("v-"+id).hidden = (id!==v);
   });
   render();
@@ -758,7 +788,7 @@ $("btn-save").addEventListener("click", async ()=>{
   const entry={
     id:uid(), bookId:state.currentBookId, text, images,
     raw:$("passage").dataset.raw||text, note:$("note").value.trim(),
-    chapter:state.draft.chapter, tags:[...state.draft.tags], createdAt:Date.now()
+    chapter:state.draft.chapter, tags:[...state.draft.tags], createdAt:Date.now(), order:Date.now()
   };
   await DB.put("entries",entry);
   await loadAll();
@@ -851,15 +881,21 @@ function openBookForm(existing){
 $("shelf").addEventListener("click",e=>{
   if(e.target.closest("#add-book")){ openBookForm(); return; }
   const bk=e.target.closest("[data-book]"); if(!bk) return;
-  state.viewingBookId=bk.dataset.book; switchView("book");
+  state.viewingBookId=bk.dataset.book; state.reorderMode=false; switchView("book");
 });
 $("back-shelf").addEventListener("click",()=>switchView("shelf"));
+$("open-explore").addEventListener("click",()=>switchView("explore"));
+$("back-shelf-2").addEventListener("click",()=>switchView("shelf"));
 
 /* --- book detail interactions (delegated) --- */
 $("book-detail").addEventListener("click", async e=>{
   if(e.target.closest("#d-setcur")){ await setCurrentBook(state.viewingBookId); render(); toast("記録する本にしました"); return; }
   if(e.target.closest("#d-edit")){ openBookForm(bookById(state.viewingBookId)); return; }
-  const en=e.target.closest("[data-entry]"); if(en){ openEntry(en.dataset.entry); }
+  if(e.target.closest("#toggle-reorder")){ state.reorderMode=!state.reorderMode; renderBookDetail(); return; }
+  const up=e.target.closest("[data-up]"); if(up){ swapEntryOrder(state.viewingBookId, up.dataset.up, -1); return; }
+  const down=e.target.closest("[data-down]"); if(down){ swapEntryOrder(state.viewingBookId, down.dataset.down, 1); return; }
+  const ed=e.target.closest("[data-edit]"); if(ed){ openEntry(ed.dataset.edit); return; }
+  if(e.target.tagName==="IMG" && e.target.closest(".entry-imgs")){ openLightbox(e.target.src); return; }
 });
 
 /* --- entry view / edit --- */
@@ -940,20 +976,28 @@ function openEntry(id){
   });
 }
 
-/* --- review interactions --- */
-$("today-wrap").addEventListener("click",e=>{ if(e.target.closest("#reshuffle")){ pickToday(); renderReview(); } });
-$("review-list").addEventListener("click",e=>{ const en=e.target.closest("[data-entry]"); if(en) openEntry(en.dataset.entry); });
+/* --- explore interactions --- */
+$("explore-list").addEventListener("click",e=>{
+  const ed=e.target.closest("[data-edit]"); if(ed){ openEntry(ed.dataset.edit); return; }
+  if(e.target.tagName==="IMG" && e.target.closest(".entry-imgs")){ openLightbox(e.target.src); return; }
+});
+$("filter-books").addEventListener("click",e=>{
+  const c=e.target.closest("[data-fbook]"); if(!c) return;
+  state.filterBook = state.filterBook===c.dataset.fbook ? null : c.dataset.fbook;
+  renderExplore();
+});
 $("filter-tags").addEventListener("click",e=>{
   const c=e.target.closest("[data-ftag]"); if(!c) return;
   state.filterTag = state.filterTag===c.dataset.ftag ? null : c.dataset.ftag;
-  renderReview();
+  renderExplore();
 });
-$("search").addEventListener("input",e=>{ state.search=e.target.value; renderReview(); });
+$("search").addEventListener("input",e=>{ state.search=e.target.value; renderExplore(); });
 $("fs-seg").addEventListener("click", async e=>{
   const b=e.target.closest("[data-fs]"); if(!b) return;
   state.reviewFontStep = +b.dataset.fs;
   await DB.put("meta",{key:"reviewFontStep",value:state.reviewFontStep});
-  renderReview();
+  applyFontStep();
+  renderExplore();
 });
 
 /* --- export / import --- */
@@ -983,10 +1027,11 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
+  applyFontStep();
   switchView("capture");
   if("serviceWorker" in navigator){
     try{ await navigator.serviceWorker.register("sw.js"); }catch(_){}
