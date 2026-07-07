@@ -652,10 +652,12 @@ function renderBookDetail(){
       ? chapterKeys.map(k=>`<button class="chip" data-jump="${keyToAnchor.get(k)}">${esc(k)}</button>`).join("")
       : "";
 
-    body += `<div class="row" style="margin:16px 2px 10px;flex-wrap:nowrap;align-items:center">
-      <div class="chips" style="flex:1;margin:0;min-width:0">${jumpChips}</div>
-      <button class="tinybtn ${state.reorderMode?"on":""}" id="toggle-reorder" style="flex:none">${state.reorderMode?"完了":"順序の編集"}</button>
+    body += `<div class="row" style="margin:16px 2px 8px;justify-content:flex-end">
+      <button class="tinybtn ${state.reorderMode?"on":""}" id="toggle-reorder">${state.reorderMode?"完了":"順序の編集"}</button>
     </div>`;
+    if(jumpChips){
+      body += `<div class="chips" style="margin:0 0 12px">${jumpChips}</div>`;
+    }
 
     if(state.reorderMode){
       let curKey=null;
@@ -1082,7 +1084,7 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v7";
+const APP_VERSION = "v8";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
