@@ -165,7 +165,7 @@
   .empty{text-align:center;color:var(--ink-faint);font-size:14px;padding:40px 20px;line-height:1.9}
   .empty .big{font-family:var(--mincho);font-size:17px;color:var(--ink-soft);display:block;margin-bottom:6px}
   .search{width:100%;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:11px 16px;font-size:15px;margin-bottom:12px}
-  .group-h{font-family:var(--mincho);font-size:13px;letter-spacing:.1em;color:var(--ink-soft);margin:18px 4px 8px}
+  .group-h{font-family:var(--mincho);font-size:14px;font-weight:700;letter-spacing:.08em;color:var(--ink);margin:18px 4px 8px;scroll-margin-top:72px}
 
   /* font size control (applies globally: book detail + explore) */
   .fs-seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;margin-left:auto}
@@ -323,6 +323,28 @@
       <div class="card">
         <div style="font-family:var(--mincho);font-size:15px;margin-bottom:6px">栞について</div>
         <p class="hint">読書中に出会った良い一節を、栞をはさむように書き留めておくための小さな道具です。要約はせず、原文とひとことを残します。<span id="stat"></span></p>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--mincho);font-size:16px;margin-bottom:10px">使い方</div>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin-bottom:2px">記録</p>
+        <p class="hint">いま読んでいる本を選び、認識テキストなどを貼り付けると自動で改行やスペースが整形されます。章・タグを選んでから「栞をはさむ」で保存します。本を切り替えない限り、次の貼り付けも同じ本に記録され続けます。</p>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">本棚</p>
+        <p class="hint">登録した本が表紙付きで並びます。本をタップすると、その本の栞だけを読むための画面が開きます。表紙・タイトル・章・状態はここの「編集」から直せます。</p>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">本の詳細（栞の並び）</p>
+        <p class="hint">栞は「章があれば章の順、章の中では登録が古いものから新しいものへ」という順番で並びます。章が付いていない栞は、章がある栞のあとにまとめて表示されます。章が多い本では、並びの上にあるチップから各章の頭へジャンプできます。<br>
+        右上の「順序の編集」を押すと、各栞に▲▼が表示され、同じ章の中で前後の順番を直せます（後から思い出して登録したときなどに使います）。章をまたいで動かすことはできません。各栞右下の「編集」ボタンからは、本文・メモ・画像・章・タグをいつでも直せます。</p>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">🔎 タグ・キーワードで探す</p>
+        <p class="hint">本棚の上部から開けます。特定の本だけに絞る、タグで絞る、キーワードで検索する、を組み合わせて、複数の本をまたいで栞を探せます。文字の大きさ（大/中/小）もここで設定でき、本の詳細画面にも同じ大きさが反映されます。</p>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">タグって何に使うの？</p>
+        <p class="hint">章が「本の中の場所」を表すのに対して、タグは「内容の種類」で栞を横断的にまとめるためのものです。例えば「文章術」「生き方」のようなタグを付けておくと、本をまたいで同じテーマの栞だけを見返せます。1つの栞に複数タグを付けても構いません。</p>
+
+        <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">設定</p>
+        <p class="hint">「書き出す」で全データ（本・栞・画像を含む）を1つのJSONファイルにできます。機種変更や家族間の共有は、このファイルを渡して「読み込む」で行います。データは常にこの端末の中だけに保存され、外部のサーバーには送られません。</p>
       </div>
     </section>
   </main>
@@ -569,16 +591,29 @@ function renderShelf(){
 /* -------- 並び順ヘルパー -------- */
 const orderOf = e => (e.order ?? e.createdAt);
 function sortedEntriesForBook(bookId){
-  return entriesOfBook(bookId).slice().sort((x,y)=>orderOf(y)-orderOf(x));
+  return entriesOfBook(bookId).slice().sort((x,y)=>orderOf(x)-orderOf(y));
+}
+// 通常表示と同じ「章優先・章なしは最後」の順序でフラットな配列を返す
+function bookDisplayOrder(b){
+  const sorted = sortedEntriesForBook(b.id);
+  const groups = new Map();
+  for(const e of sorted){ const k=e.chapter||"（章なし）"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); }
+  const chapOrder = (b.chapters&&b.chapters.length) ? [...b.chapters,"（章なし）"] : [...groups.keys()];
+  const flat=[];
+  for(const k of chapOrder){ const arr=groups.get(k); if(arr) flat.push(...arr); }
+  return flat;
 }
 async function swapEntryOrder(bookId, entryId, delta){
-  const list = sortedEntriesForBook(bookId);
+  const b = bookById(bookId); if(!b) return;
+  const list = bookDisplayOrder(b);
   const idx = list.findIndex(e=>e.id===entryId);
   const swapIdx = idx+delta;
   if(idx<0 || swapIdx<0 || swapIdx>=list.length) return;
-  const a=list[idx], b=list[swapIdx];
-  const tmp=orderOf(a); a.order=orderOf(b); b.order=tmp;
-  await DB.put("entries",a); await DB.put("entries",b);
+  const a=list[idx], other=list[swapIdx];
+  // 章の境界はまたがせない（章の割り当てはそのままに、章内の順番だけ変える）
+  if((a.chapter||"（章なし）") !== (other.chapter||"（章なし）")) return;
+  const tmp=orderOf(a); a.order=orderOf(other); other.order=tmp;
+  await DB.put("entries",a); await DB.put("entries",other);
   await loadAll(); renderBookDetail();
 }
 
@@ -587,7 +622,7 @@ function renderBookDetail(){
   const b = bookById(state.viewingBookId);
   const host=$("book-detail");
   if(!b){ host.innerHTML=`<div class="empty">本が見つかりません</div>`; return; }
-  const sorted = sortedEntriesForBook(b.id);
+  const flat = bookDisplayOrder(b);
   const isNow = b.id===state.currentBookId;
   const cover = b.cover
     ? `<div class="cover" style="width:56px;height:78px;border-radius:6px;background:url(${b.cover});background-size:cover"></div>`
@@ -598,7 +633,7 @@ function renderBookDetail(){
     <div style="flex:1;min-width:0">
       <div style="font-family:var(--mincho);font-size:18px;line-height:1.4">${esc(b.title)}</div>
       <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">${esc(b.author||"")}</div>
-      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">${sorted.length}件 ・ ${b.status==="done"?"読了":"読書中"}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">${flat.length}件 ・ ${b.status==="done"?"読了":"読書中"}</div>
       <div class="row" style="margin-top:12px">
         ${isNow?`<span class="tinybtn" style="border-color:var(--brass);color:var(--brass)">記録中</span>`
                 :`<button class="tinybtn" id="d-setcur">この本を記録対象にする</button>`}
@@ -607,23 +642,36 @@ function renderBookDetail(){
     </div>
   </div>`;
 
-  if(!sorted.length){
+  if(!flat.length){
     body += `<div class="empty"><span class="big">まだ栞がありません</span>この本を読みながら、良い一節を書き留めましょう。</div>`;
   } else {
-    body += `<div class="row" style="margin:16px 2px 10px">
-      <button class="tinybtn ${state.reorderMode?"on":""}" id="toggle-reorder">${state.reorderMode?"並び替え完了":"並び替え"}</button>
+    // 章キーごとにアンカーIDを割り当て（ジャンプボタン・見出し共通）
+    const keyToAnchor = new Map(); const chapterKeys=[];
+    for(const e of flat){ const k=e.chapter||"（章なし）"; if(!keyToAnchor.has(k)){ keyToAnchor.set(k,"chapanchor-"+keyToAnchor.size); chapterKeys.push(k); } }
+    const jumpChips = chapterKeys.length>1
+      ? chapterKeys.map(k=>`<button class="chip" data-jump="${keyToAnchor.get(k)}">${esc(k)}</button>`).join("")
+      : "";
+
+    body += `<div class="row" style="margin:16px 2px 10px;flex-wrap:nowrap;align-items:center">
+      <div class="chips" style="flex:1;margin:0;min-width:0">${jumpChips}</div>
+      <button class="tinybtn ${state.reorderMode?"on":""}" id="toggle-reorder" style="flex:none">${state.reorderMode?"完了":"順序の編集"}</button>
     </div>`;
+
     if(state.reorderMode){
-      body += sorted.map((e,i)=>entryCard(e,{reorder:true, canUp:i>0, canDown:i<sorted.length-1})).join("");
+      let curKey=null;
+      flat.forEach((e,i)=>{
+        const key = e.chapter||"（章なし）";
+        if(key!==curKey){ body += `<div class="group-h" id="${keyToAnchor.get(key)}">${esc(key)}</div>`; curKey=key; }
+        const prevSame = i>0 && (flat[i-1].chapter||"（章なし）")===key;
+        const nextSame = i<flat.length-1 && (flat[i+1].chapter||"（章なし）")===key;
+        body += entryCard(e,{reorder:true, canUp:prevSame, canDown:nextSame});
+      });
     } else {
-      // 章ごとにグループ化（章があれば章順、なければ「章なし」1グループ）
-      const groups = new Map();
-      for(const e of sorted){ const k=e.chapter||"（章なし）"; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); }
-      const order = (b.chapters&&b.chapters.length)? [...b.chapters,"（章なし）"] : [...groups.keys()];
-      for(const k of order){
-        const arr=groups.get(k); if(!arr) continue;
-        body += `<div class="group-h">${esc(k)}</div>`;
-        body += arr.map(e=>entryCard(e,{})).join("");
+      let curKey=null;
+      for(const e of flat){
+        const k=e.chapter||"（章なし）";
+        if(k!==curKey){ body += `<div class="group-h" id="${keyToAnchor.get(k)}">${esc(k)}</div>`; curKey=k; }
+        body += entryCard(e,{});
       }
     }
   }
@@ -769,8 +817,10 @@ $("tag-chips").addEventListener("click",e=>{
 function promptNewTag(){
   openSheet(`<h2>タグを追加</h2>
     <input class="in" id="newtag" placeholder="例：文章術 / 生き方 / 引用" autocomplete="off">
-    <button class="primary" id="newtag-ok">追加する</button>`);
+    <button class="primary" id="newtag-ok">追加する</button>
+    <button class="ghost" id="newtag-cancel">キャンセル</button>`);
   setTimeout(()=>$("newtag").focus(),120);
+  $("newtag-cancel").addEventListener("click",closeSheet);
   $("newtag-ok").addEventListener("click",()=>{
     const v=$("newtag").value.trim();
     if(v && !state.draft.tags.includes(v)) state.draft.tags.push(v);
@@ -839,9 +889,11 @@ function openBookForm(existing){
       <button data-st="done" class="${b.status==="done"?"on":""}">読了</button>
     </div>
     <button class="primary" id="book-save">${existing?"保存する":"この本を追加"}</button>
+    <button class="ghost" id="book-cancel">キャンセル</button>
     ${existing?`<button class="destructive" id="book-del">この本とメモを削除</button>`:""}`);
 
   let coverData=b.cover, status=b.status||"reading";
+  $("book-cancel").addEventListener("click",closeSheet);
   $("cov-btn").addEventListener("click",()=>$("cov-file").click());
   $("cov-file").addEventListener("change", async e=>{
     const f=e.target.files[0]; if(!f) return;
@@ -892,6 +944,7 @@ $("book-detail").addEventListener("click", async e=>{
   if(e.target.closest("#d-setcur")){ await setCurrentBook(state.viewingBookId); render(); toast("記録する本にしました"); return; }
   if(e.target.closest("#d-edit")){ openBookForm(bookById(state.viewingBookId)); return; }
   if(e.target.closest("#toggle-reorder")){ state.reorderMode=!state.reorderMode; renderBookDetail(); return; }
+  const jump=e.target.closest("[data-jump]"); if(jump){ document.getElementById(jump.dataset.jump)?.scrollIntoView({behavior:"smooth", block:"start"}); return; }
   const up=e.target.closest("[data-up]"); if(up){ swapEntryOrder(state.viewingBookId, up.dataset.up, -1); return; }
   const down=e.target.closest("[data-down]"); if(down){ swapEntryOrder(state.viewingBookId, down.dataset.down, 1); return; }
   const ed=e.target.closest("[data-edit]"); if(ed){ openEntry(ed.dataset.edit); return; }
@@ -924,9 +977,11 @@ function openEntry(id){
     </div>
     <div style="font-size:11px;color:var(--ink-faint);margin:12px 2px">${b?esc(b.title):""} ・ ${fmtDate(e.createdAt)}</div>
     <button class="primary" id="e-save">保存する</button>
+    <button class="ghost" id="e-cancel">キャンセル</button>
     <button class="destructive" id="e-del">この栞を削除</button>`);
 
   let chapter=e.chapter, tags=[...(e.tags||[])], images=[...(e.images||[])];
+  $("e-cancel").addEventListener("click",closeSheet);
   const paintImgs=()=>{
     $("ei-strip").innerHTML = images.map((s,i)=>
       `<span class="th"><img src="${s}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></span>`).join("");
@@ -1027,7 +1082,7 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v6";
+const APP_VERSION = "v7";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
