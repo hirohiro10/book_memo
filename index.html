@@ -126,11 +126,15 @@
   .entry-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
   .entry-meta .tag{color:var(--indigo)}
   .entry-note{font-size:var(--rfs-note,13px);color:var(--ink-soft);margin-top:8px;padding-left:10px;border-left:2px solid var(--brass)}
-  .imgstrip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .imgstrip .th{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}
+  .imgstrip{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .imgstrip .item{display:flex;flex-direction:column;gap:4px;width:72px;flex:none}
+  .imgstrip .th{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
   .imgstrip .th img{width:100%;height:100%;object-fit:cover;display:block}
   .imgstrip .th .rm{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
     background:rgba(35,49,77,.78);color:#fff;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .imgstrip .q-toggle{font-size:10px;padding:3px 0;border:1px solid var(--line-strong);border-radius:6px;color:var(--ink-soft);background:var(--card);text-align:center;letter-spacing:.02em}
+  .imgstrip .q-toggle.hi{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .imgstrip .q-static{font-size:10px;padding:3px 0;color:var(--ink-faint);text-align:center}
   .entry-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-top:10px}
   .entry-imgs img{width:100%;border-radius:8px;border:1px solid var(--line);display:block;cursor:zoom-in}
 
@@ -328,7 +332,7 @@
         <div style="font-family:var(--mincho);font-size:16px;margin-bottom:10px">使い方</div>
 
         <p class="hint" style="font-weight:600;color:var(--ink-soft);margin-bottom:2px">記録</p>
-        <p class="hint">いま読んでいる本を選び、認識テキストなどを貼り付けると自動で改行やスペースが整形されます。章・タグを選んでから「栞をはさむ」で保存します。本を切り替えない限り、次の貼り付けも同じ本に記録され続けます。</p>
+        <p class="hint">いま読んでいる本を選び、認識テキストなどを貼り付けると自動で改行やスペースが整形されます。章・タグを選んでから「栞をはさむ」で保存します。本を切り替えない限り、次の貼り付けも同じ本に記録され続けます。図や写真も添付でき、各画像の下の「標準／高精細」をタップで切り替えられます。新聞や図表など細かい文字を後から読み返したいときだけ「高精細」にすると鮮明に残せます（そのぶん容量は増えます）。</p>
 
         <p class="hint" style="font-weight:600;color:var(--ink-soft);margin:14px 0 2px">本棚</p>
         <p class="hint">登録した本が表紙付きで並びます。本をタップすると、その本の栞だけを読むための画面が開きます。表紙・タイトル・章・状態はここの「編集」から直せます。</p>
@@ -479,7 +483,7 @@ async function loadAll(){
   state.currentBookId = cur ? cur.value : (state.books[0]?.id ?? null);
   state.reviewFontStep = fs ? fs.value : 0;
 }
-const setCurrentBook = async id => { state.currentBookId=id; await DB.put("meta",{key:"currentBookId",value:id}); };
+const setCurrentBook = async id => { state.currentBookId=id; state.draft.chapter=null; await DB.put("meta",{key:"currentBookId",value:id}); };
 const bookById = id => state.books.find(b=>b.id===id);
 const entriesOfBook = id => state.entries.filter(e=>e.bookId===id);
 const allTags = () => [...new Set(state.entries.flatMap(e=>e.tags||[]))];
@@ -518,6 +522,10 @@ function downscaleImage(file, max=1280, quality=0.8){
   });
 }
 const fileToCover = file => downscaleImage(file, 640, 0.72);
+// 添付画像: 標準=長辺1280 / 高精細=長辺2048（画質はどちらもq0.8）
+const encodeAttachment = (file, hi) => downscaleImage(file, hi?2048:1280, 0.8);
+// 保存済み画像は文字列(旧)または{data,hi}(新)の両対応
+const imgSrc = x => (typeof x==="string" ? x : (x && x.data) || "");
 
 /* =======================================================================
    RENDER
@@ -544,6 +552,8 @@ function renderCapture(){
   // chapters
   const chapWrap=$("chap-chips"), chapLabel=$("chap-label");
   const chaps = b && b.chapters && b.chapters.length ? b.chapters : [];
+  // 前の本で選んでいた章が現在の本に無ければ選択解除（本を跨いだ混入を防ぐ）
+  if(state.draft.chapter && !chaps.includes(state.draft.chapter)) state.draft.chapter=null;
   if(chaps.length){
     chapLabel.hidden=false; chapWrap.hidden=false;
     chapWrap.innerHTML = chaps.map(c=>
@@ -561,8 +571,11 @@ function renderCapture(){
   updateSaveState();
 }
 function renderImgStrip(){
-  $("img-strip").innerHTML = state.draft.images.map((s,i)=>
-    `<span class="th"><img src="${s}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></span>`).join("");
+  $("img-strip").innerHTML = state.draft.images.map((im,i)=>
+    `<div class="item">
+      <div class="th"><img src="${im.data}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></div>
+      <button class="q-toggle ${im.hi?"hi":""}" data-q="${i}">${im.hi?"高精細":"標準"}</button>
+    </div>`).join("");
 }
 function updateSaveState(){
   const hasContent = $("passage").value.trim().length>0 || state.draft.images.length>0;
@@ -689,7 +702,7 @@ function entryCard(e, opts={}){
     e.chapter ? esc(e.chapter) : "",
     fmtDate(e.createdAt)
   ].filter(Boolean).join("　·　");
-  const imgs=(e.images&&e.images.length)?`<div class="entry-imgs">${e.images.map(s=>`<img src="${s}" loading="lazy">`).join("")}</div>`:"";
+  const imgs=(e.images&&e.images.length)?`<div class="entry-imgs">${e.images.map(x=>`<img src="${imgSrc(x)}" loading="lazy">`).join("")}</div>`:"";
   const upBtn = opts.reorder?`<button class="reorder-btn" data-up="${e.id}" ${opts.canUp?"":"disabled"} aria-label="上へ">▲</button>`:"";
   const downBtn = opts.reorder?`<button class="reorder-btn" data-down="${e.id}" ${opts.canDown?"":"disabled"} aria-label="下へ">▼</button>`:"";
   return `<div class="card entry-card">
@@ -760,7 +773,15 @@ function switchView(v){
   render();
 }
 document.querySelectorAll("nav.tabs button").forEach(btn=>{
-  btn.addEventListener("click",()=>switchView(btn.dataset.tab));
+  btn.addEventListener("click",()=>{
+    const tab=btn.dataset.tab;
+    // 「本棚」を押したとき、直前に見ていた本があればその本の詳細に戻す
+    if(tab==="shelf" && state.viewingBookId && bookById(state.viewingBookId)){
+      switchView("book");
+    } else {
+      switchView(tab);
+    }
+  });
 });
 
 /* --- passage input --- */
@@ -777,16 +798,23 @@ $("btn-img").addEventListener("click",()=>$("img-file").click());
 $("img-file").addEventListener("change", async e=>{
   for(const f of e.target.files){
     if(state.draft.images.length>=6){ toast("画像は1つの栞につき6枚までです"); break; }
-    const d=await downscaleImage(f);
-    if(d) state.draft.images.push(d);
+    const data=await encodeAttachment(f,false);
+    if(data) state.draft.images.push({file:f, data, hi:false});
   }
   e.target.value="";
   renderImgStrip(); updateSaveState();
 });
-$("img-strip").addEventListener("click",e=>{
-  const b=e.target.closest("[data-rm]"); if(!b) return;
-  state.draft.images.splice(+b.dataset.rm,1);
-  renderImgStrip(); updateSaveState();
+$("img-strip").addEventListener("click", async e=>{
+  const rm=e.target.closest("[data-rm]");
+  if(rm){ state.draft.images.splice(+rm.dataset.rm,1); renderImgStrip(); updateSaveState(); return; }
+  const q=e.target.closest("[data-q]");
+  if(q){
+    const im=state.draft.images[+q.dataset.q]; if(!im||!im.file) return;
+    im.hi=!im.hi;
+    const data=await encodeAttachment(im.file, im.hi);
+    if(data) im.data=data;
+    renderImgStrip();
+  }
 });
 
 $("btn-clip").addEventListener("click", async ()=>{
@@ -834,7 +862,7 @@ function promptNewTag(){
 /* --- save entry --- */
 $("btn-save").addEventListener("click", async ()=>{
   const text=$("passage").value.trim();
-  const images=[...state.draft.images];
+  const images=state.draft.images.map(im=>({data:im.data, hi:!!im.hi}));
   if(!text && !images.length){ toast("本文か画像を入れてください"); return; }
   if(!state.currentBookId){ toast("先に本を選んでください"); openBookPicker(); return; }
   const entry={
@@ -937,7 +965,7 @@ $("shelf").addEventListener("click",e=>{
   const bk=e.target.closest("[data-book]"); if(!bk) return;
   state.viewingBookId=bk.dataset.book; state.reorderMode=false; switchView("book");
 });
-$("back-shelf").addEventListener("click",()=>switchView("shelf"));
+$("back-shelf").addEventListener("click",()=>{ state.viewingBookId=null; state.reorderMode=false; switchView("shelf"); });
 $("open-explore").addEventListener("click",()=>switchView("explore"));
 $("back-shelf-2").addEventListener("click",()=>switchView("shelf"));
 
@@ -982,24 +1010,38 @@ function openEntry(id){
     <button class="ghost" id="e-cancel">キャンセル</button>
     <button class="destructive" id="e-del">この栞を削除</button>`);
 
-  let chapter=e.chapter, tags=[...(e.tags||[])], images=[...(e.images||[])];
+  let chapter=e.chapter, tags=[...(e.tags||[])];
+  // 既存画像は {data,hi} に正規化（fileなし＝再エンコード不可）、新規は file 付き
+  let images=(e.images||[]).map(x=> typeof x==="string" ? {data:x, hi:false, file:null} : {data:x.data, hi:!!x.hi, file:null});
   $("e-cancel").addEventListener("click",closeSheet);
   const paintImgs=()=>{
-    $("ei-strip").innerHTML = images.map((s,i)=>
-      `<span class="th"><img src="${s}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></span>`).join("");
+    $("ei-strip").innerHTML = images.map((im,i)=>
+      `<div class="item">
+        <div class="th"><img src="${im.data}"><button class="rm" data-rm="${i}" aria-label="削除">×</button></div>
+        ${im.file
+          ? `<button class="q-toggle ${im.hi?"hi":""}" data-q="${i}">${im.hi?"高精細":"標準"}</button>`
+          : `<div class="q-static">${im.hi?"高精細":"標準"}</div>`}
+      </div>`).join("");
   };
   paintImgs();
   $("ei-add").addEventListener("click",()=>$("ei-file").click());
   $("ei-file").addEventListener("change", async ev=>{
     for(const f of ev.target.files){
       if(images.length>=6){ toast("画像は1つの栞につき6枚までです"); break; }
-      const d=await downscaleImage(f); if(d) images.push(d);
+      const data=await encodeAttachment(f,false); if(data) images.push({file:f, data, hi:false});
     }
     ev.target.value=""; paintImgs();
   });
-  $("ei-strip").addEventListener("click",ev=>{
-    const b=ev.target.closest("[data-rm]"); if(!b) return;
-    images.splice(+b.dataset.rm,1); paintImgs();
+  $("ei-strip").addEventListener("click", async ev=>{
+    const rm=ev.target.closest("[data-rm]");
+    if(rm){ images.splice(+rm.dataset.rm,1); paintImgs(); return; }
+    const q=ev.target.closest("[data-q]");
+    if(q){
+      const im=images[+q.dataset.q]; if(!im||!im.file) return;
+      im.hi=!im.hi;
+      const data=await encodeAttachment(im.file, im.hi); if(data) im.data=data;
+      paintImgs();
+    }
   });
   const eTags=$("e-tags");
   const paintTags=()=>{ eTags.querySelectorAll("[data-et]").forEach(el=>el.classList.toggle("on",tags.includes(el.dataset.et))); };
@@ -1023,7 +1065,8 @@ function openEntry(id){
   });
   $("e-save").addEventListener("click", async ()=>{
     e.text=$("e-text").value.trim(); e.note=$("e-note").value.trim();
-    e.chapter=chapter; e.tags=tags; e.images=images;
+    e.chapter=chapter; e.tags=tags;
+    e.images=images.map(im=>({data:im.data, hi:!!im.hi}));
     if(!e.text && !images.length){ toast("本文か画像を入れてください"); return; }
     await DB.put("entries",e); await loadAll(); closeSheet(); render(); toast("保存しました");
   });
@@ -1084,7 +1127,7 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v8";
+const APP_VERSION = "v10";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
