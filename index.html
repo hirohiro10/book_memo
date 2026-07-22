@@ -793,10 +793,20 @@ document.querySelectorAll("nav.tabs button").forEach(btn=>{
 });
 
 /* --- passage input --- */
+/* カーソル位置にテキストを挿入する（選択範囲があれば置き換え）。
+   余計な改行・空行は足さず、挿入後はカーソルを挿入文の末尾に置く。 */
+function insertAtCaret(ta, text){
+  const start = ta.selectionStart ?? ta.value.length;
+  const end   = ta.selectionEnd   ?? ta.value.length;
+  ta.value = ta.value.slice(0,start) + text + ta.value.slice(end);
+  const pos = start + text.length;
+  ta.setSelectionRange(pos,pos);
+}
+
 $("passage").addEventListener("paste",(e)=>{
   const t=(e.clipboardData||window.clipboardData).getData("text");
   if(t){ e.preventDefault(); const c=cleanText(t);
-    const ta=$("passage"); ta.value = ta.value ? ta.value+"\n\n"+c : c;
+    const ta=$("passage"); insertAtCaret(ta, c);
     ta.dataset.raw=t; render(); }
 });
 $("passage").addEventListener("input",updateSaveState);
@@ -831,7 +841,7 @@ $("btn-clip").addEventListener("click", async ()=>{
     const t=await navigator.clipboard.readText();
     if(!t){ toast("クリップボードが空です"); return; }
     const ta=$("passage"), c=cleanText(t);
-    ta.value = ta.value ? ta.value+"\n\n"+c : c; ta.dataset.raw=t; render();
+    insertAtCaret(ta, c); ta.dataset.raw=t; ta.focus(); render();
   }catch(_){ toast("貼り付けできません。枠内に直接ペーストしてください"); }
 });
 $("btn-clean").addEventListener("click",()=>{ const ta=$("passage"); ta.value=cleanText(ta.value); });
@@ -1136,7 +1146,7 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v13";
+const APP_VERSION = "v14";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
