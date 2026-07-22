@@ -1,5 +1,5 @@
 /* 栞 service worker — アプリシェルをキャッシュしてオフライン起動を可能にする */
-const CACHE = "shiori-v12";
+const CACHE = "shiori-v13";
 const SHELL = [
   ".",
   "index.html",

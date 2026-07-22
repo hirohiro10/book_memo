@@ -763,7 +763,7 @@ function renderSettings(){
    ==================================================================== */
 
 /* --- tab nav --- */
-function switchView(v){
+function switchView(v, opts={}){
   state.view=v;
   const navKey = (v==="book"||v==="explore") ? "shelf" : v;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===navKey));
@@ -772,6 +772,13 @@ function switchView(v){
   });
   render();
   window.scrollTo(0,0);
+  // 記録画面を開いたら本文欄にカーソルを置く。端末が出す「ペースト」候補が
+  // すぐ使えるので、ボタンを探さずに貼り付けられる。
+  // 入力途中の内容がある場合は邪魔しないよう、空のときだけ。
+  // 起動直後は勝手にキーボードが出ないよう、明示的な操作のときだけ。
+  if(v==="capture" && opts.focus && !$("passage").value){
+    setTimeout(()=>{ if(state.view==="capture") $("passage").focus(); }, 60);
+  }
 }
 document.querySelectorAll("nav.tabs button").forEach(btn=>{
   btn.addEventListener("click",()=>{
@@ -780,7 +787,7 @@ document.querySelectorAll("nav.tabs button").forEach(btn=>{
     if(tab==="shelf" && state.viewingBookId && bookById(state.viewingBookId)){
       switchView("book");
     } else {
-      switchView(tab);
+      switchView(tab, {focus:true});
     }
   });
 });
@@ -818,12 +825,14 @@ $("img-strip").addEventListener("click", async e=>{
   }
 });
 
-$("btn-clip").addEventListener("click", ()=>{
-  // クリップボードをJSで直接読みに行くと、iOSは毎回「許可」の確認を挟んでくる。
-  // ここではテキスト欄にカーソルを合わせるだけにして、端末が自前で出す
-  // 「ペースト」候補（確認なしの1タップ）や、長押しメニューからの貼り付けを使ってもらう。
-  // 貼り付け後の自動整形は、下のpasteイベントリスナーが担当する。
-  $("passage").focus();
+$("btn-clip").addEventListener("click", async ()=>{
+  // OSの確認を1回挟むが、許可すればそのまま整形して貼り付けまで完了する。
+  try{
+    const t=await navigator.clipboard.readText();
+    if(!t){ toast("クリップボードが空です"); return; }
+    const ta=$("passage"), c=cleanText(t);
+    ta.value = ta.value ? ta.value+"\n\n"+c : c; ta.dataset.raw=t; render();
+  }catch(_){ toast("貼り付けできません。枠内に直接ペーストしてください"); }
 });
 $("btn-clean").addEventListener("click",()=>{ const ta=$("passage"); ta.value=cleanText(ta.value); });
 $("btn-clear").addEventListener("click",()=>{ $("passage").value=""; $("passage").dataset.raw=""; render(); });
@@ -1127,7 +1136,7 @@ $("import-file").addEventListener("change", async e=>{
 /* =======================================================================
    BOOT
    ==================================================================== */
-const APP_VERSION = "v12";
+const APP_VERSION = "v13";
 (async function(){
   $("app-version").textContent = APP_VERSION;
   await loadAll();
